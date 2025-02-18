@@ -1,8 +1,9 @@
 ﻿#ifndef DUNGEON_H
 #define DUNGEON_H
 
-#define GRID_HEIGHT 300
-#define GRID_WIDTH 300
+#define GRID_HEIGHT 100
+#define GRID_WIDTH 100
+#define CELL_SIZE 10
 
 #define ROOM_MAX_SIZE 30
 #define ROOM_MIN_SIZE 10
