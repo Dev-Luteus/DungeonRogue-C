@@ -19,17 +19,26 @@ void GenerateDungeon (int grid[GRID_HEIGHT][GRID_WIDTH])
  */
 void PrintDungeon (int grid[GRID_HEIGHT][GRID_WIDTH])
 {
+    int totalHeight = GRID_HEIGHT * CELL_SIZE;
+    int totalWidth = GRID_WIDTH * CELL_SIZE;
+
+    int startX = (GetScreenWidth() - totalWidth) / 2;
+    int startY = (GetScreenHeight() - totalHeight) / 2;
+
     for (int y = 0; y < GRID_HEIGHT; y++)
     {
         for (int x = 0; x < GRID_WIDTH; x++)
         {
+            int drawX = startX + (x * CELL_SIZE);
+            int drawY = startY + (y * CELL_SIZE);
+
             if (grid[y][x] == 0)
             {
-                DrawRectangle(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE, GRAY);
+                DrawRectangle(drawX, drawY, CELL_SIZE, CELL_SIZE, GRAY);
             }
             else
             {
-                DrawRectangle(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE, BLACK);
+                DrawRectangle(drawX, drawY, CELL_SIZE, CELL_SIZE, BLACK);
             }
         }
     }
