@@ -1,7 +1,6 @@
 ﻿#include <raylib.h>
 #include "Dungeon.h"
 
-
 void GenerateDungeon (int grid[GRID_HEIGHT][GRID_WIDTH])
 {
     // Fill the grid with empty space
@@ -22,7 +21,7 @@ void PrintDungeon (int grid[GRID_HEIGHT][GRID_WIDTH])
         {
             if (grid[y][x] == 0)
             {
-                DrawRectangle(x * 10, y * 10, 10, 10, WHITE);
+                DrawRectangle(x * 10, y * 10, 10, 10, GRAY);
             }
             else
             {

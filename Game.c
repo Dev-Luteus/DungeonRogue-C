@@ -7,7 +7,8 @@ Game InitGame (int width, int height)
     const Game game =
     {
         .screenWidth = width,
-        .screenHeight = height
+        .screenHeight = height,
+        .grid = {0} // default initialization
     };
 
     return game;
@@ -15,7 +16,7 @@ Game InitGame (int width, int height)
 
 void UpdateGame (Game* game)
 {
-
+    GenerateDungeon(game->grid);
 }
 
 void DrawGame (Game game)
@@ -23,6 +24,7 @@ void DrawGame (Game game)
     BeginDrawing();
     {
         ClearBackground(RAYWHITE);
+        PrintDungeon(game.grid);
     }
     EndDrawing();
 }
