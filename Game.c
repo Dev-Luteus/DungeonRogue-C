@@ -16,7 +16,11 @@ Game InitGame (int width, int height)
 
 void UpdateGame (Game* game)
 {
-    GenerateDungeon(game->grid);
+    if (!game->dungeonGenerated)
+    {
+        GenerateDungeon(game->grid);
+        game->dungeonGenerated = true;
+    }
 }
 
 void DrawGame (Game game)

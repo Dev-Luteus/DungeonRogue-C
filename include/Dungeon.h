@@ -18,12 +18,20 @@ void PrintDungeon(int grid[GRID_HEIGHT][GRID_WIDTH]);
 
 typedef struct
 {
-    Vector2 position;
+    int x;
+    int y;
     int width;
     int height;
 } Room;
 
-Room CreateRoom(int x, int y, int width, int height);
+void GenerateGrid(int grid[GRID_HEIGHT][GRID_WIDTH]);
 
+Room CreateRoom(int x, int y, int width, int height);
+void GenerateRooms(int grid[GRID_HEIGHT][GRID_WIDTH]);
+bool GenerateRoom(int grid[GRID_HEIGHT][GRID_WIDTH]);
+bool IsRoomValid(int grid[GRID_HEIGHT][GRID_WIDTH], Room room);
+
+void PlaceRoom(int grid[GRID_HEIGHT][GRID_WIDTH], Room room);
+void GenerateDungeon(int grid[GRID_HEIGHT][GRID_WIDTH]);
 
 #endif //DUNGEON_H

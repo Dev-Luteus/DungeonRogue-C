@@ -7,6 +7,7 @@ typedef struct
     int screenWidth;
     int screenHeight;
     int grid[GRID_HEIGHT][GRID_WIDTH];
+    bool dungeonGenerated;
 } Game;
 
 Game InitGame(int width, int height);
