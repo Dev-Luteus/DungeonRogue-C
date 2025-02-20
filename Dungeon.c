@@ -1,6 +1,21 @@
 ﻿#include <raylib.h>
 #include "Dungeon.h"
 
+/* In this loop we make a simple 2d grid
+ * We then colour the grid based on the XOR AND of x and y */
+void GenerateGrid(int grid[GRID_HEIGHT][GRID_WIDTH])
+{
+    for (int y = 0; y < GRID_HEIGHT; y++)
+    {
+        for (int x = 0; x < GRID_WIDTH; x++)
+        {
+            // XOR, Compare x / y
+            // & 1 => If both bits are 1, result is 1! Else 0!
+            grid[y][x] = (x ^ y) & 1;
+        }
+    }
+}
+
 Room CreateRoom (int x, int y, int width, int height)
 {
     Room room =
@@ -57,21 +72,6 @@ void PlaceRoom(int grid[GRID_HEIGHT][GRID_WIDTH], Room room)
         for (int x = room.x; x < room.x + room.width; x++)
         {
             grid[y][x] = 2; // Mark as room cell
-        }
-    }
-}
-
-/* In this loop we make a simple 2d grid
- * We then colour the grid based on the XOR AND of x and y */
-void GenerateGrid(int grid[GRID_HEIGHT][GRID_WIDTH])
-{
-    for (int y = 0; y < GRID_HEIGHT; y++)
-    {
-        for (int x = 0; x < GRID_WIDTH; x++)
-        {
-            // XOR, Compare x / y
-            // & 1 => If both bits are 1, result is 1! Else 0!
-            grid[y][x] = (x ^ y) & 1;
         }
     }
 }
