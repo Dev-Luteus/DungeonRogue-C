@@ -31,9 +31,9 @@ bool IsRoomValid (int grid[GRID_HEIGHT][GRID_WIDTH], Room room)
         return false;
     }
 
-    for (int y = room.y - 2; y < room.y + room.height + 2; y++)
+    for (int y = room.y - 3; y < room.y + room.height + 3; y++)
     {
-        for (int x = room.x - 2; x < room.x + room.width + 2; x++)
+        for (int x = room.x - 3; x < room.x + room.width + 3; x++)
         {
             if (x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT)
             {

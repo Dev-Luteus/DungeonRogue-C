@@ -12,9 +12,9 @@ void PrintDungeon(int grid[GRID_HEIGHT][GRID_WIDTH]);
 
 #define ROOM_MAX_SIZE 30
 #define ROOM_MIN_SIZE 10
-#define ROOM_MIN_WIDTH 6
-#define ROOM_MIN_HEIGHT 6
-#define ROOM_AMOUNT 10
+#define ROOM_MIN_WIDTH 10
+#define ROOM_MIN_HEIGHT 10
+#define ROOM_AMOUNT 20
 
 typedef struct
 {
