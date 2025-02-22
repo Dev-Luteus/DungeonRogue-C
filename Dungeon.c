@@ -120,7 +120,7 @@ bool GenerateRoom(int grid[GRID_HEIGHT][GRID_WIDTH])
  */
 bool IsValidCorridorCell(int grid[GRID_HEIGHT][GRID_WIDTH], int x, int y)
 {
-    if (x < 2 || y < 2 || x >= GRID_WIDTH - 2 || y >= GRID_HEIGHT - 2)
+    if (x < 1 || y < 1 || x >= GRID_WIDTH - 1 || y >= GRID_HEIGHT - 1)
     {
         return false;
     }
@@ -131,38 +131,10 @@ bool IsValidCorridorCell(int grid[GRID_HEIGHT][GRID_WIDTH], int x, int y)
         return false;
     }
 
-    // Here, we check the 5 x 5 area around the cell for rooms!
-    // (-2, -2) to (2, 2) ( 5 x 5 )
-    for (int cy = -2; cy <= 2; ++cy)
+    // Don't allow corridors to spawn on room cells!
+    if (grid[y][x] == CELL_ROOM)
     {
-        for (int cx = -2; cx <= 2; ++cx)
-        {
-            // Check cells
-            int newX = x + cx;
-            int newY = y + cy;
-
-            // Skip out-of-bounds checks
-            if (newX < 0 || newX >= GRID_WIDTH || newY < 0 || newY >= GRID_HEIGHT)
-            {
-                continue;
-            }
-
-            if (grid[newY][newX] == CELL_ROOM)
-            {
-                // Checking diagonals with using the Manhattan distance formula!
-                // = abs(x1 - x2) + abs(y1 - y2)
-
-                int xDist = abs(cx);
-                int yDist = abs(cy);
-
-                // If both distances are 1, we found a diagonal point (room corner)
-                // Or if we're too close to the room
-                if ((xDist == 1 && yDist == 1) || (xDist + yDist < 3))  // padding
-                {
-                    return false;
-                }
-            }
-        }
+        return false;
     }
 
     // Here, we count the adjacent corridors (including diagonals)
@@ -184,7 +156,7 @@ bool IsValidCorridorCell(int grid[GRID_HEIGHT][GRID_WIDTH], int x, int y)
 
             if (newX >= 0 && newX < GRID_WIDTH-2 && newY >= 0 && newY < GRID_HEIGHT-2)
             {
-                if (grid[newY][newX] == CELL_ROOM)
+                if (grid[newY][newX] == CELL_CORRIDOR)
                 {
                     corridorCount++;
                 }

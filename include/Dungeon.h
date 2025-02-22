@@ -20,11 +20,11 @@ void GenerateDungeon(int grid[GRID_HEIGHT][GRID_WIDTH]);
 void PrintDungeon(int grid[GRID_HEIGHT][GRID_WIDTH]);
 
 // Rooms
-#define ROOM_MAX_SIZE 30
+#define ROOM_MAX_SIZE 26
 #define ROOM_MIN_SIZE 10
 #define ROOM_MIN_WIDTH 10
 #define ROOM_MIN_HEIGHT 10
-#define ROOM_AMOUNT 20
+#define ROOM_AMOUNT 24
 
 typedef struct
 {
