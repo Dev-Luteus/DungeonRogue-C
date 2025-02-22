@@ -114,9 +114,7 @@ bool GenerateRoom(int grid[GRID_HEIGHT][GRID_WIDTH])
 
 /* This is our general check if we can generate corridors on cells in the grid!
  * We first check the grid boundaries, then,
- * We check the if the cell is empty ( not room or corridor ), then,
- * As the corridor progresses, we must check if any of the neighbouring cells has a room.
- * We do this to make sure that the corridors has at least 1 cell of spacing between rooms and corridors.
+ * We check the if the cell is empty ( not room or corridor ),
  */
 bool IsValidCorridorCell(int grid[GRID_HEIGHT][GRID_WIDTH], int x, int y)
 {
@@ -127,12 +125,6 @@ bool IsValidCorridorCell(int grid[GRID_HEIGHT][GRID_WIDTH], int x, int y)
 
     // Only empty cells are valid!
     if (grid[y][x] != CELL_EMPTY_1 && grid[y][x] != CELL_EMPTY_2)
-    {
-        return false;
-    }
-
-    // Don't allow corridors to spawn on room cells!
-    if (grid[y][x] == CELL_ROOM)
     {
         return false;
     }
