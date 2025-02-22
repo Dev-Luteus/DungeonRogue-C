@@ -8,8 +8,9 @@
 #define CELL_CORRIDOR 3
 
 // General
-#define GRID_HEIGHT 100
-#define GRID_WIDTH 100
+// The Height and Width should be an ODD number
+#define GRID_HEIGHT 99
+#define GRID_WIDTH 99
 #define CELL_SIZE 10
 #define GRID_TOTAL_HEIGHT GRID_HEIGHT * CELL_SIZE
 #define GRID_TOTAL_WIDTH GRID_WIDTH * CELL_SIZE
@@ -40,22 +41,19 @@ void PlaceRoom(int grid[GRID_HEIGHT][GRID_WIDTH], Room room);
 void GenerateRooms(int grid[GRID_HEIGHT][GRID_WIDTH]);
 
 // Corridors
-/* Normally you'd think about the origin being at (0,0), but in computer graphics,
- * The origin is often in the top left corner. Hence, Y has to be negative to go up!
- * So we essentially flip the Y axis.
- * North: (0, -1), East: (1, 0), South: (0, 1), West: (-1, 0)
- *
- * Also, two single-dimension arrays are apparently more performant,
- * and more cache friendly than using a 2D array with more overhead.
- */
-#define dirX [0, 1, 0, -1] // North, East, South, West
-#define dirY [-1, 0, 1, 0] // North, East, South, West
-
 typedef struct
 {
     int x;
     int y;
 } Corridor;
+
+typedef enum
+{
+    DIR_NORTH = 0,
+    DIR_EAST = 1,
+    DIR_SOUTH = 2,
+    DIR_WEST = 3
+} Direction;
 
 bool IsValidCorridorCell(int grid[GRID_HEIGHT][GRID_WIDTH], int x, int y);
 void RandomizedFloodFill(int grid[GRID_HEIGHT][GRID_WIDTH], int startX, int startY);
