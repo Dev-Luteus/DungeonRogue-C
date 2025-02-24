@@ -1,6 +1,7 @@
 ﻿#include <raylib.h>
 #include "Dungeon.h"
 
+#include <stdint.h>
 #include <stdlib.h>
 
 /* In this loop we make a simple 2d grid
@@ -40,76 +41,74 @@ Room CreateRoom (int x, int y, int width, int height)
  * if they're too close, we return false!
  * This allows us to place rooms until we find a valid one!
  */
-bool IsRoomValid (int grid[GRID_HEIGHT][GRID_WIDTH], Room room)
+bool IsRoomValid(int grid[GRID_HEIGHT][GRID_WIDTH], Room room)
 {
-    if (room.x < 2 || room.y < 2 ||
-        room.x + room.width >= GRID_WIDTH-2 ||room.y + room.height >= GRID_HEIGHT-2)
+    if (room.x < ROOM_BOUNDARY_PADDING || room.y < ROOM_BOUNDARY_PADDING ||
+        room.x + room.width >= GRID_WIDTH - ROOM_BOUNDARY_PADDING ||
+        room.y + room.height >= GRID_HEIGHT - ROOM_BOUNDARY_PADDING)
     {
         return false;
     }
 
-    for (int y = room.y - 3; y < room.y + room.height + 3; y++)
+    for (int y = room.y - ROOM_SPACING; y < room.y + room.height + ROOM_SPACING; y++)
     {
-        for (int x = room.x - 3; x < room.x + room.width + 3; x++)
+        for (int x = room.x - ROOM_SPACING; x < room.x + room.width + ROOM_SPACING; x++)
         {
             if (x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT)
             {
-                if (grid[y][x] == 2)
+                if (grid[y][x] >= ROOM_ID_START)
                 {
                     return false;
                 }
             }
         }
     }
-    // And if all has been checked, return true, the room is valid
+
     return true;
 }
 
 /* This is where we attempt placing rooms in our grid,
  * By iterating over every cell in the room and marking it */
-void PlaceRoom(int grid[GRID_HEIGHT][GRID_WIDTH], Room room)
+void PlaceRoom(int grid[GRID_HEIGHT][GRID_WIDTH], Room room, int roomId)
 {
     for (int y = room.y; y < room.y + room.height; y++)
     {
         for (int x = room.x; x < room.x + room.width; x++)
         {
-            grid[y][x] = 2; // Mark as room cell
+            grid[y][x] = roomId; // Mark as room cell
         }
     }
 }
 
-void GenerateRooms(int grid[GRID_HEIGHT][GRID_WIDTH])
+void GenerateRooms(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int* roomCount)
 {
+    *roomCount = 0;
+    int nextRoomId = ROOM_ID_START;
+    const int MAX_ATTEMPTS = 100; // per room
+
     for (int i = 0; i < ROOM_AMOUNT; i++)
     {
-        GenerateRoom(grid);
-    }
-}
+        bool roomPlaced = false;
 
-/* This is where we generate a room of a random size, then,
- * If the room is in a valid position, we place it in the grid! */
-bool GenerateRoom(int grid[GRID_HEIGHT][GRID_WIDTH])
-{
-    const int MAX_ATTEMPTS = 100;
-
-    for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++)
-    {
-        int width = GetRandomValue(ROOM_MIN_WIDTH, ROOM_MAX_SIZE);
-        int height = GetRandomValue(ROOM_MIN_HEIGHT, ROOM_MAX_SIZE);
-
-        int x = GetRandomValue(0, GRID_WIDTH - width);
-        int y = GetRandomValue(0, GRID_HEIGHT - height);
-
-        Room room = CreateRoom(x, y, width, height);
-
-        if (IsRoomValid(grid, room))
+        for (int attempt = 0; attempt < MAX_ATTEMPTS && !roomPlaced; attempt++)
         {
-            PlaceRoom(grid, room);
-            return true;
+            int width = GetRandomValue(ROOM_MIN_WIDTH, ROOM_MAX_SIZE);
+            int height = GetRandomValue(ROOM_MIN_HEIGHT, ROOM_MAX_SIZE);
+            int x = GetRandomValue(0, GRID_WIDTH - width);
+            int y = GetRandomValue(0, GRID_HEIGHT - height);
+
+            Room room = CreateRoom(x, y, width, height);
+
+            if (IsRoomValid(grid, room))
+            {
+                PlaceRoom(grid, room, nextRoomId);
+                rooms[*roomCount] = room;
+                (*roomCount)++;
+                nextRoomId++;
+                roomPlaced = true;
+            }
         }
     }
-
-    return false;
 }
 
 /* This is our general check if we can generate corridors on cells in the grid!
@@ -133,24 +132,34 @@ bool IsValidCorridorCell(int grid[GRID_HEIGHT][GRID_WIDTH], int x, int y)
     int corridorCount = 0;
 
     // (-1, -1) to (1, 1) ( 3 x 3)
-    for (int cy = -1; cy <= 1; ++cy)
+    for (int cy = -1; cy <= 1; cy++)
     {
-        for (int cx = -1; cx <= 1; ++cx)
+        for (int cx = -1; cx <= 1; cx++)
         {
             if (cx == 0 && cy == 0)
             {
                 continue;
             }
 
-            // Check cells
             int newX = x + cx;
             int newY = y + cy;
 
-            if (newX >= 0 && newX < GRID_WIDTH-2 && newY >= 0 && newY < GRID_HEIGHT-2)
+            if (newX >= 0 && newX < GRID_WIDTH && newY >= 0 && newY < GRID_HEIGHT)
             {
+                // Checking diagonals with using the Manhattan distance formula!
+                // = abs(x1 - x2) + abs(y1 - y2)
+
+                int xDist = abs(cx);
+                int yDist = abs(cy);
+
+                if (grid[newY][newX] >= ROOM_ID_START && ((xDist == 1 && yDist == 1) || (xDist + yDist < 2)))
+                {
+                    return false; // Too close to room corner or room
+                }
+
                 if (grid[newY][newX] == CELL_CORRIDOR)
                 {
-                    corridorCount++;
+                    return false; // Maintain 1 cell spacing from corridors
                 }
             }
         }
@@ -307,11 +316,168 @@ void GenerateMazes(int grid[GRID_HEIGHT][GRID_WIDTH])
     }
 }
 
-void GenerateDungeon (int grid[GRID_HEIGHT][GRID_WIDTH])
+/* Here, we attempt to create connections between rooms and corridors,
+ * First we allocate memory for a boolean array to keep track of connections,
+ * Then, we iterate over each room, and check if we can connect it to a corridor,
+ *
+ * We then introduce randomness to door placement, and check if we can place a door,
+ * If we can, we place a door, and mark the room as connected.
+ * If we cannot, we try to place a door in a random direction, followed by a corridor cell.
+ *
+ */
+void ConnectRoomsViaDoors(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int roomCount)
 {
+    // calloc => runtime heap allocation, initializes 0 (false for bool)
+    bool* hasConnection = (bool*)calloc(roomCount, sizeof(bool));
+
+    if (hasConnection == NULL)
+    {
+        return; // Allocation failed!
+    }
+
+    // Wall offsets for [checkX, checkY, doorX, doorY] in N-S-W-E order
+    const int8_t x = 2; // corridor-room spacing amount!
+    const int8_t d = 1;  // Door distance from room!
+
+    const int8_t walls[][4] = {
+        {0, -x, 0, -d},    // N
+        {0, x, 0, d},      // S
+        {-x, 0, -d, 0},    // W
+        {x, 0, d, 0}       // E
+    };
+
+    for (int i = 0; i < roomCount; ++i)
+    {
+        // Prevent multiple connections
+        if (hasConnection[i])
+        {
+            continue;
+        }
+
+        // Get current room
+        Room room = rooms[i];
+        bool doorPlaced = false;
+
+        for (int wall = 0; wall < 4 && !doorPlaced; wall++)
+        {
+            /* wall = 0 (North) or wall = 1 (South) -> horizontal movement ( <---> )
+             * wall = 2 (West) or wall = 3 (East) -> vertical movement ( | )
+             */
+            bool isHorizontal = wall < 2;
+
+            int start = isHorizontal ? room.x : room.y;
+            int length = isHorizontal ? room.width : room.height;
+
+            for (int pos = 0; pos < length && !doorPlaced; pos++)
+            {
+                // Clever way to get X/Y based on Horizontal/Vertical
+                int x = isHorizontal ? (room.x + pos) : room.x;
+                int y = isHorizontal ? room.y : (room.y + pos);
+
+                /* 2D Array [(Y: Row)], [(X: Column)], ex:
+                 *
+                 * When we check the north wall: {0, -2, 0, -1},
+                 * walls[0][0] = 0     // X offset
+                 * walls[0][1] = -2    // Y offset
+                 *
+                 * So, we check the grid cell that's offset from our current (x,y) position,
+                 * by the amounts stored in the walls array
+                 */
+                if (grid[y + walls[wall][1]][x + walls[wall][0]] == CELL_CORRIDOR)
+                {
+                    // Here, I'm introducing randomness to door placement
+                    int chance = DOOR_NEXT_CHANCE_INITIAL;
+                    int finalX = x;
+                    int finalY = y;
+
+                    while (pos + 1 < length && GetRandomValue(0, 100) < chance)
+                    {
+                        int nextX = finalX + (isHorizontal ? 1 : 0);
+                        int nextY = finalY + (isHorizontal ? 0 : 1);
+
+                        if (grid[nextY + walls[wall][1]][nextX + walls[wall][0]] == CELL_CORRIDOR)
+                        {
+                            finalX = nextX;
+                            finalY = nextY;
+                            chance -= DOOR_CHANCE_DECREASE;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+
+                    grid[finalY + walls[wall][3]][finalX + walls[wall][2]] = CELL_DOOR;
+                    hasConnection[i] = true;
+                    doorPlaced = true;
+                }
+            }
+        }
+
+        /* Safety check: If no corridor was found within normal range,
+         * create a new connection in a random direction
+         */
+        if (!doorPlaced)
+        {
+            int directions[4] = {0, 1, 2, 3};  // N, S, W, E
+
+            // Here, I use a Fisher-Yates shuffle for a random direction order
+            for (int i = 3; i > 0; i--)
+            {
+                int j = GetRandomValue(0, i);
+                int temp = directions[i];
+
+                directions[i] = directions[j];
+                directions[j] = temp;
+            }
+
+            // Try each direction
+            for (int i = 0; i < 4 && !doorPlaced; i++)
+            {
+                int wall = directions[i];
+                bool isHorizontal = wall < 2;
+
+                // Pick random position along the wall
+                int length = isHorizontal ? room.width : room.height;
+                int pos = GetRandomValue(0, length - 1);
+
+                int x = isHorizontal ? (room.x + pos) : room.x;
+                int y = isHorizontal ? room.y : (room.y + pos);
+
+                int doorX = x + walls[wall][2];
+                int doorY = y + walls[wall][3];
+                int corridorX = x + walls[wall][0];
+                int corridorY = y + walls[wall][1];
+
+                if (doorX >= 1 && doorX < GRID_WIDTH - 1 &&
+                    doorY >= 1 && doorY < GRID_HEIGHT - 1 &&
+                    corridorX >= 1 && corridorX < GRID_WIDTH - 1 &&
+                    corridorY >= 1 && corridorY < GRID_HEIGHT - 1)
+                {
+                    if ((grid[doorY][doorX] == CELL_EMPTY_1 || grid[doorY][doorX] == CELL_EMPTY_2) &&
+                        (grid[corridorY][corridorX] == CELL_EMPTY_1 || grid[corridorY][corridorX] == CELL_EMPTY_2))
+                    {
+                        grid[doorY][doorX] = CELL_DOOR;
+                        grid[corridorY][corridorX] = CELL_CORRIDOR;
+                        hasConnection[i] = true;
+                        doorPlaced = true;
+                    }
+                }
+            }
+        }
+    }
+    free(hasConnection);
+}
+
+void GenerateDungeon(int grid[GRID_HEIGHT][GRID_WIDTH])
+{
+    Room rooms[ROOM_AMOUNT];
+    int roomCount;
+
     GenerateGrid(grid);
-    GenerateRooms(grid);
+    GenerateRooms(grid, rooms, &roomCount);
     GenerateMazes(grid);
+    ConnectRoomsViaDoors(grid, rooms, roomCount);
 }
 
 /* Our main print function.
@@ -332,23 +498,27 @@ void PrintDungeon(int grid[GRID_HEIGHT][GRID_WIDTH])
             int drawX = startX + (x * CELL_SIZE);
             int drawY = startY + (y * CELL_SIZE);
 
-            switch(grid[y][x])
+            if (grid[y][x] >= ROOM_ID_START)
             {
-                case 0:
-                    DrawRectangle(drawX, drawY, CELL_SIZE, CELL_SIZE, GRAY);
-                break;
+                DrawRectangle(drawX, drawY, CELL_SIZE, CELL_SIZE, BLACK);
+            }
+            else
+            {
+                switch(grid[y][x])
+                {
+                    case CELL_EMPTY_1:
+                    case CELL_EMPTY_2:
+                        DrawRectangle(drawX, drawY, CELL_SIZE, CELL_SIZE, GRAY);
+                    break;
 
-                case 1:
-                    DrawRectangle(drawX, drawY, CELL_SIZE, CELL_SIZE, GRAY);
-                break;
+                    case CELL_CORRIDOR:
+                        DrawRectangle(drawX, drawY, CELL_SIZE, CELL_SIZE, DARKGRAY);
+                    break;
 
-                case 2:
-                    DrawRectangle(drawX, drawY, CELL_SIZE, CELL_SIZE, BLACK);
-                break;
-
-                case CELL_CORRIDOR:
-                    DrawRectangle(drawX, drawY, CELL_SIZE, CELL_SIZE, DARKGRAY);
-                break;
+                    case CELL_DOOR:
+                        DrawRectangle(drawX, drawY, CELL_SIZE, CELL_SIZE, RED);
+                    break;
+                }
             }
         }
     }

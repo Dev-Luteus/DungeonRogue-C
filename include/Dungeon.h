@@ -6,6 +6,8 @@
 #define CELL_EMPTY_2 1 // Empty 2 (currently just for pattern)
 #define CELL_ROOM 2
 #define CELL_CORRIDOR 3
+#define CELL_DOOR 4
+#define ROOM_ID_START 10 // ID 10 and Up
 
 // General
 // The Height and Width should be an ODD number
@@ -20,11 +22,14 @@ void GenerateDungeon(int grid[GRID_HEIGHT][GRID_WIDTH]);
 void PrintDungeon(int grid[GRID_HEIGHT][GRID_WIDTH]);
 
 // Rooms
-#define ROOM_MAX_SIZE 26
-#define ROOM_MIN_SIZE 10
-#define ROOM_MIN_WIDTH 10
-#define ROOM_MIN_HEIGHT 10
-#define ROOM_AMOUNT 24
+#define ROOM_MAX_SIZE 24
+#define ROOM_MIN_SIZE 12
+#define ROOM_MIN_WIDTH 8
+#define ROOM_MIN_HEIGHT 8
+#define ROOM_AMOUNT 16
+
+#define ROOM_BOUNDARY_PADDING 4
+#define ROOM_SPACING 4
 
 typedef struct
 {
@@ -35,10 +40,9 @@ typedef struct
 } Room;
 
 Room CreateRoom(int x, int y, int width, int height);
-bool GenerateRoom(int grid[GRID_HEIGHT][GRID_WIDTH]);
 bool IsRoomValid(int grid[GRID_HEIGHT][GRID_WIDTH], Room room);
-void PlaceRoom(int grid[GRID_HEIGHT][GRID_WIDTH], Room room);
-void GenerateRooms(int grid[GRID_HEIGHT][GRID_WIDTH]);
+void PlaceRoom(int grid[GRID_HEIGHT][GRID_WIDTH], Room room, int roomId);
+void GenerateRooms(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int* roomCount);
 
 // Corridors
 typedef struct
@@ -58,5 +62,13 @@ typedef enum
 bool IsValidCorridorCell(int grid[GRID_HEIGHT][GRID_WIDTH], int x, int y);
 void RandomizedFloodFill(int grid[GRID_HEIGHT][GRID_WIDTH], int startX, int startY);
 void GenerateMazes(int grid[GRID_HEIGHT][GRID_WIDTH]);
+
+// Doors
+#define DOOR_NEXT_CHANCE_INITIAL 100
+#define DOOR_CHANCE_DECREASE 15
+
+void ConnectRoomsViaDoors(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int roomCount);
+bool ValidateRoomConnections(int grid[GRID_HEIGHT][GRID_WIDTH]);
+void RemoveDeadEndCorridors(int grid[GRID_HEIGHT][GRID_WIDTH]);
 
 #endif //DUNGEON_H
