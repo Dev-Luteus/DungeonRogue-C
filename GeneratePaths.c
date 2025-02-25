@@ -13,10 +13,13 @@ static const int dirY[] = { -1, 0, 1, 0 };
 // Helper function to return the Manhattan distance between two rooms!
 static int GetRoomDistance(Room a, Room b)
 {
-    int centerAX = a.x + (a.width / 2);
-    int centerAY = a.y + (a.height / 2);
-    int centerBX = b.x + (b.width / 2);
-    int centerBY = b.y + (b.height / 2);
+    /* This used to use division, but I learned that Bit Shifts are faster
+     * Makes sense, we can prevent a more expensive calculation!
+     */
+    int centerAX = a.x + (a.width >> 1);
+    int centerAY = a.y + (a.height >> 1);
+    int centerBX = b.x + (b.width >> 1);
+    int centerBY = b.y + (b.height >> 1);
 
     return abs(centerAX - centerBX) + abs(centerAY - centerBY);
 }
@@ -90,21 +93,40 @@ Room FindBossRoom(Room rooms[], int roomCount)
 // Here, we iterate over the room perimeter and find the door position!
 bool FindDoorPosition(int grid[GRID_HEIGHT][GRID_WIDTH], Room room, int* doorX, int* doorY)
 {
-    for (int y = room.y - 1; y <= room.y + room.height; y++)
+    // Check top and bottom edges
+    for (int x = room.x - 1; x <= room.x + room.width; x++)
     {
-        for (int x = room.x - 1; x <= room.x + room.width; x++)
+        if (grid[room.y - 1][x] == CELL_DOOR)
         {
-            if (grid[y][x] == CELL_DOOR)
-            {
-                *doorX = x;
-                *doorY = y;
-
-                return true;
-            }
+            *doorX = x;
+            *doorY = room.y - 1;
+            return true;
+        }
+        if (grid[room.y + room.height][x] == CELL_DOOR)
+        {
+            *doorX = x;
+            *doorY = room.y + room.height;
+            return true;
         }
     }
 
-    // should never happen but just in case
+    // Check left and right edges
+    for (int y = room.y; y < room.y + room.height; y++)
+    {
+        if (grid[y][room.x - 1] == CELL_DOOR)
+        {
+            *doorX = room.x - 1;
+            *doorY = y;
+            return true;
+        }
+        if (grid[y][room.x + room.width] == CELL_DOOR)
+        {
+            *doorX = room.x + room.width;
+            *doorY = y;
+            return true;
+        }
+    }
+
     printf("No door found for room at (%d, %d)!\n", room.x, room.y);
     return false;
 }
