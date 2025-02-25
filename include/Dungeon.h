@@ -15,12 +15,16 @@
 #define GRID_HEIGHT 79
 #define GRID_WIDTH 79
 #define CELL_SIZE 13
-#define GRID_TOTAL_HEIGHT GRID_HEIGHT * CELL_SIZE
-#define GRID_TOTAL_WIDTH GRID_WIDTH * CELL_SIZE
+#define GRID_TOTAL_HEIGHT (GRID_HEIGHT * CELL_SIZE)
+#define GRID_TOTAL_WIDTH (GRID_WIDTH * CELL_SIZE)
 
-void GenerateGrid(int grid[GRID_HEIGHT][GRID_WIDTH]);
-void GenerateDungeon(int grid[GRID_HEIGHT][GRID_WIDTH]);
-void PrintDungeon(int grid[GRID_HEIGHT][GRID_WIDTH]);
+// Optimization Macros
+#define HALF(x) ((x) >> 1)
+#define CENTER_SCREEN_X(width) ((GetScreenWidth() - (width)) >> 1)
+#define CENTER_SCREEN_Y(height) ((GetScreenHeight() - (height)) >> 1)
+#define IS_IN_GRID(x, y) ((x) >= 0 && (x) < GRID_WIDTH && (y) >= 0 && (y) < GRID_HEIGHT)
+#define IS_ROOM(cell) ((cell) >= ROOM_ID_START)
+#define IS_EMPTY(cell) ((cell) == CELL_EMPTY_1 || (cell) == CELL_EMPTY_2)
 
 // Rooms
 #define ROOM_MAX_SIZE 18
@@ -31,6 +35,12 @@ void PrintDungeon(int grid[GRID_HEIGHT][GRID_WIDTH]);
 
 #define ROOM_BOUNDARY_PADDING 4
 #define ROOM_SPACING 3
+
+// Room Random Bounds
+#define ROOM_WIDTH_MIN_BOUND 0
+#define ROOM_WIDTH_MAX_BOUND (GRID_WIDTH - ROOM_MAX_SIZE)
+#define ROOM_HEIGHT_MIN_BOUND 0
+#define ROOM_HEIGHT_MAX_BOUND (GRID_HEIGHT - ROOM_MAX_SIZE)
 
 typedef struct
 {
@@ -69,8 +79,6 @@ void GenerateMazes(int grid[GRID_HEIGHT][GRID_WIDTH]);
 #define DOOR_CHANCE_DECREASE 15
 
 void ConnectRoomsViaDoors(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int roomCount);
-
-// Paths
 bool FindDoorPosition(int grid[GRID_HEIGHT][GRID_WIDTH], Room room, int* doorX, int* doorY);
 
 #endif //DUNGEON_H

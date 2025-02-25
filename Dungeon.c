@@ -53,13 +53,18 @@ bool IsRoomValid(int grid[GRID_HEIGHT][GRID_WIDTH], Room room)
         return false;
     }
 
-    for (int y = room.y - ROOM_SPACING; y < room.y + room.height + ROOM_SPACING; y++)
+    const int startY = room.y - ROOM_SPACING;
+    const int endY = room.y + room.height + ROOM_SPACING;
+    const int startX = room.x - ROOM_SPACING;
+    const int endX = room.x + room.width + ROOM_SPACING;
+
+    for (int y = startY; y < endY; y++)
     {
-        for (int x = room.x - ROOM_SPACING; x < room.x + room.width + ROOM_SPACING; x++)
+        if (IS_IN_GRID(0, y))
         {
-            if (x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT)
+            for (int x = startX; x < endX; x++)
             {
-                if (grid[y][x] >= ROOM_ID_START)
+                if (IS_IN_GRID(x, 0) && IS_ROOM(grid[y][x]))
                 {
                     return false;
                 }
@@ -95,10 +100,10 @@ void GenerateRooms(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int* roomCou
 
         for (int attempt = 0; attempt < MAX_ATTEMPTS && !roomPlaced; attempt++)
         {
-            int width = GetRandomValue(ROOM_MIN_WIDTH, ROOM_MAX_SIZE);
-            int height = GetRandomValue(ROOM_MIN_HEIGHT, ROOM_MAX_SIZE);
-            int x = GetRandomValue(0, GRID_WIDTH - width);
-            int y = GetRandomValue(0, GRID_HEIGHT - height);
+            const int width = GetRandomValue(ROOM_MIN_WIDTH, ROOM_MAX_SIZE);
+            const int height = GetRandomValue(ROOM_MIN_HEIGHT, ROOM_MAX_SIZE);
+            const int x = GetRandomValue(ROOM_WIDTH_MIN_BOUND, ROOM_WIDTH_MAX_BOUND);
+            const int y = GetRandomValue(ROOM_HEIGHT_MIN_BOUND, ROOM_HEIGHT_MAX_BOUND);
 
             Room room = CreateRoom(x, y, width, height);
 
@@ -120,13 +125,16 @@ void GenerateRooms(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int* roomCou
  */
 bool IsValidCorridorCell(int grid[GRID_HEIGHT][GRID_WIDTH], int x, int y)
 {
-    if (x < 1 || y < 1 || x >= GRID_WIDTH - 1 || y >= GRID_HEIGHT - 1)
+    if (!IS_IN_GRID(x, y) || x < 1 || y < 1 || x >= GRID_WIDTH - 1 || y >= GRID_HEIGHT - 1)
     {
         return false;
     }
 
+    // Cache the cell value
+    const int cell = grid[y][x];
+
     // Only empty cells are valid!
-    if (grid[y][x] != CELL_EMPTY_1 && grid[y][x] != CELL_EMPTY_2)
+    if (!IS_EMPTY(cell))
     {
         return false;
     }
@@ -193,14 +201,14 @@ const int dirY[] = {-1, 0, 1, 0};  // North, East, South, West
 void RandomizedFloodFill(int grid[GRID_HEIGHT][GRID_WIDTH], int startX, int startY)
 {
     // Early validation of parameters before allocation
-    if (startX < 0 || startX >= GRID_WIDTH || startY < 0 || startY >= GRID_HEIGHT)
+    if (!IS_IN_GRID(startX, startY))
     {
         return;
     }
 
     // Here we allocate memory for our algorithm,
     // Rooms already take space in the grid, so we don't need the whole grid!
-    size_t stackCapacity = (size_t)(GRID_WIDTH * GRID_HEIGHT) / 4;
+    size_t stackCapacity = (size_t)(GRID_WIDTH * GRID_HEIGHT) >> 2; // same as / 2
     Corridor* stack = (Corridor*)malloc(stackCapacity * sizeof(Corridor));
 
     if (stack == NULL)
@@ -213,20 +221,24 @@ void RandomizedFloodFill(int grid[GRID_HEIGHT][GRID_WIDTH], int startX, int star
 
     // To initiate the "stack" and the corridor generation,
     // We add the startPos to the stack and mark it as a corridor cell
-    if (IsValidCorridorCell(grid, startX, startY))
+    bool isValidStart = IsValidCorridorCell(grid, startX, startY); // caching validity
+
+    if (isValidStart)
     {
         stack[stackSize++] = (Corridor){ startX, startY };
         grid[startY][startX] = CELL_CORRIDOR;
     }
 
+    const int DIRECTION_BIAS_THRESHOLD = 30;  // 70% chance to continue in the same direction!
+
     // This is an attempt at a Growing-Tree Algorithm
     while (stackSize > 0)
     {
         // Get last corridor in the stack ( our most recently added ) 
-        Corridor current = stack[stackSize - 1];
+        const Corridor current = stack[stackSize - 1];
 
         // Here, we find the valid directions
-        bool foundValidDirection = false; 
+        bool foundValidDirection = false;
         int availableDirections[4];
         int numValidDirections = 0; 
 
@@ -234,8 +246,8 @@ void RandomizedFloodFill(int grid[GRID_HEIGHT][GRID_WIDTH], int startX, int star
         for (int d = 0; d < 4; d++)
         {
             // Here, we move 2 cells in a direction ( 1 cell padding )
-            int newX = current.x + (dirX[d] * 2);  // dirY and dirX in Dungeon.h
-            int newY = current.y + (dirY[d] * 2);
+            const int newX = current.x + (dirX[d] << 1); // << 1 is the same as * 2!
+            const int newY = current.y + (dirY[d] << 1);
 
             // Check if we can create corridors in this direction
             if (IsValidCorridorCell(grid, newX, newY))
@@ -250,7 +262,9 @@ void RandomizedFloodFill(int grid[GRID_HEIGHT][GRID_WIDTH], int startX, int star
             int dirIndex;
 
             // Introducing direction bias!
-            if (lastDir >= 0 && GetRandomValue(0, 100) > 30) // 70% chance to continue same direction
+            const int randomChance = GetRandomValue(0, 100); // cache random value
+
+            if (lastDir >= 0 && randomChance > DIRECTION_BIAS_THRESHOLD) // 70% chance to continue same direction
             {
                 // Iterate through valid directions
                 for (int i = 0; i < numValidDirections; i++)
@@ -274,15 +288,15 @@ void RandomizedFloodFill(int grid[GRID_HEIGHT][GRID_WIDTH], int startX, int star
             }
 
             // This keeps track of which direction we chose!
-            int direction = availableDirections[dirIndex];
+            const int direction = availableDirections[dirIndex];
             lastDir = direction; // We then store it for the next iteration, in case we want to continue that way!
 
             // Calculate middle and end positions
-            int midX = current.x + dirX[direction];      // One step in chosen direction
-            int midY = current.y + dirY[direction];
+            const int midX = current.x + dirX[direction]; // One step in chosen direction
+            const int midY = current.y + dirY[direction];
 
-            int newX = current.x + (dirX[direction] * 2); // Two steps in chosen direction
-            int newY = current.y + (dirY[direction] * 2);
+            const int newX = current.x + (dirX[direction] << 1);
+            const int newY = current.y + (dirY[direction] << 1);
 
             grid[midY][midX] = CELL_CORRIDOR;    // Set middle cell to corridor
             grid[newY][newX] = CELL_CORRIDOR;    // Set destination cell to corridor
@@ -307,11 +321,19 @@ void RandomizedFloodFill(int grid[GRID_HEIGHT][GRID_WIDTH], int startX, int star
 // Here, we generate our mazes from multiple points!
 void GenerateMazes(int grid[GRID_HEIGHT][GRID_WIDTH])
 {
-    for (int i = 2; i < GRID_HEIGHT-2; i += 2) // 2 at a time!
+    /* Instead of writing " 2 ", we use a constant for processing speed.
+     * Apparently, this form of caching is faster than using direct value, at least theoretically,
+     * So it is a stretch to claim this!
+     */
+    const int STEP_SIZE = 2;
+    const int boundaryY = GRID_HEIGHT - STEP_SIZE;
+    const int boundaryX = GRID_WIDTH - STEP_SIZE;
+
+    for (int i = STEP_SIZE; i < boundaryY; i += STEP_SIZE)
     {
-        for (int j = 2; j < GRID_WIDTH-2; j += 2)
+        for (int j = STEP_SIZE; j < boundaryX; j += STEP_SIZE)
         {
-            if (IsValidCorridorCell(grid, j, i))
+            if (IS_IN_GRID(j, i) && IsValidCorridorCell(grid, j, i))
             {
                 RandomizedFloodFill(grid, j, i);
             }
@@ -565,26 +587,27 @@ void GenerateDungeon(int grid[GRID_HEIGHT][GRID_WIDTH])
  */
 void PrintDungeon(int grid[GRID_HEIGHT][GRID_WIDTH])
 {
-    int totalHeight = GRID_HEIGHT * CELL_SIZE;
-    int totalWidth = GRID_WIDTH * CELL_SIZE;
+    const int totalHeight = GRID_TOTAL_HEIGHT;
+    const int totalWidth = GRID_TOTAL_WIDTH;
 
-    int startX = (GetScreenWidth() - totalWidth) / 2;
-    int startY = (GetScreenHeight() - totalHeight) / 2;
+    const int startX = CENTER_SCREEN_X(totalWidth);
+    const int startY = CENTER_SCREEN_Y(totalHeight);
 
     for (int y = 0; y < GRID_HEIGHT; y++)
     {
         for (int x = 0; x < GRID_WIDTH; x++)
         {
-            int drawX = startX + (x * CELL_SIZE);
-            int drawY = startY + (y * CELL_SIZE);
+            const int drawX = startX + (x * CELL_SIZE);
+            const int drawY = startY + (y * CELL_SIZE);
+            const int cell = grid[y][x];
 
-            if (grid[y][x] >= ROOM_ID_START)
+            if (IS_ROOM(cell))
             {
                 DrawRectangle(drawX, drawY, CELL_SIZE, CELL_SIZE, BLACK);
             }
             else
             {
-                switch(grid[y][x])
+                switch(cell)
                 {
                     case CELL_EMPTY_1:
                     case CELL_EMPTY_2:
