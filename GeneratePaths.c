@@ -216,13 +216,13 @@ static bool FindPathBetweenDoors(int grid[GRID_HEIGHT][GRID_WIDTH],
      * while still allowing small detours when necessary.
      */
     const int MAX_NEW_PATH_CELLS = 4;
-    int maxNewPaths = MAX_NEW_PATH_CELLS;
+    int newPathCount = 0;  // Track how many new path cells we've created
 
     // Set byte size to 0 every time we reset paths! also faster than a loop!
     memset(visited, 0, GRID_SIZE * sizeof(bool));
 
     int queueFront = 0; // Index to Take Cells from ( Front of Queue )
-    int queueBack = 0; // Index to Add Cells to ( Back of Queue )
+    int queueBack = 0;  // Index to Add Cells to ( Back of Queue )
 
     // Starting Position: ( add, increment, set visited )
     queue[queueBack] = currentDoor;
@@ -230,7 +230,6 @@ static bool FindPathBetweenDoors(int grid[GRID_HEIGHT][GRID_WIDTH],
     visited[GET_GRID_INDEX(currentDoor.x, currentDoor.y)] = true;
 
     bool foundPath = false;
-    int newPathCount = 0;  // Track how many new path cells we've created
 
     // BSF, Breadth-First Search Algorithm attempt
     while (queueFront < queueBack && !foundPath)
@@ -268,15 +267,19 @@ static bool FindPathBetweenDoors(int grid[GRID_HEIGHT][GRID_WIDTH],
                 {
                     if (grid[newY][newX] == CELL_CORRIDOR || grid[newY][newX] == CELL_PATH)
                     {
-                        canExtend = true;
-                        isNewPath = false;
-                        break;  // Immediately use existing corridor or path
+                        // Check if using this corridor would create a 2-cell wide path
+                        if (IsValidPathPlacement(grid, newX, newY, isVerticalMove))
+                        {
+                            canExtend = true;
+                            isNewPath = false;
+                            break;  // Immediately use existing corridor or path
+                        }
                     }
                     else if (CAN_BE_PATH(grid[newY][newX]) &&
-                            grid[newY][newX] != CELL_DOOR &&
-                            queueBack < maxAllowedLength &&
-                            newPathCount < MAX_NEW_PATH_CELLS &&
-                            IsValidPathPlacement(grid, newX, newY, isVerticalMove))
+                             grid[newY][newX] != CELL_DOOR &&
+                             queueBack < maxAllowedLength &&
+                             newPathCount < MAX_NEW_PATH_CELLS &&
+                             IsValidPathPlacement(grid, newX, newY, isVerticalMove))
                     {
                         canExtend = true;
                         isNewPath = true;
@@ -301,14 +304,20 @@ static bool FindPathBetweenDoors(int grid[GRID_HEIGHT][GRID_WIDTH],
 
                     if (isNewPath)
                     {
-                        newPathCount++;  // Only increment for new paths
+                        newPathCount++;
                     }
                 }
             }
         }
     }
 
-    return false;
+    if (!foundPath)
+    {
+        printf("No path found with 4 new cells. Allowing more cells...\n");
+        newPathCount = MAX_NEW_PATH_CELLS + 1;
+    }
+
+    return foundPath;
 }
 
 void GeneratePaths(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int roomCount, int startRoomIndex, int bossRoomIndex)
@@ -337,7 +346,8 @@ void GeneratePaths(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int roomCoun
     {
         int nextRoom = FindClosestRoom(rooms, roomCount, connected, currentRoom);
 
-        if (nextRoom != -1)
+        // Ensure nextRoom is valid and not equal to currentRoom
+        if (nextRoom != -1 && nextRoom != currentRoom)
         {
             int nextDoorX, nextDoorY;
 
@@ -370,12 +380,18 @@ void GeneratePaths(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int roomCoun
                     }
 
                     // Update current door and room for next iteration
+                    printf("Connected room %d to room %d\n", currentRoom, nextRoom);
                     currentDoor = (Corridor){nextDoorX, nextDoorY};
                     connected[nextRoom] = true;
                     roomsConnected++;
                     currentRoom = nextRoom;
                 }
             }
+        }
+        else
+        {
+            printf("No valid room to connect to from room %d\n", currentRoom);
+            break; // Exit the loop if no valid room is found
         }
     }
 

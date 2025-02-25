@@ -27,16 +27,19 @@
 #define IS_EMPTY(cell) ((cell) == CELL_EMPTY_1 || (cell) == CELL_EMPTY_2)
 
 // Rooms
-#define ROOM_MAX_SIZE 18
+#define ROOM_MAX_SIZE 16
 #define ROOM_MIN_SIZE 9
 #define ROOM_MIN_WIDTH 7
 #define ROOM_MIN_HEIGHT 7
-#define ROOM_AMOUNT 14
-
+#define ROOM_AMOUNT 12
 #define ROOM_BOUNDARY_PADDING 4
 #define ROOM_SPACING 3
 
-// Room Random Bounds
+// Room Size Tiers
+#define ROOM_SIZE_LARGE_MIN 75  // 75-100%
+#define ROOM_SIZE_MEDIUM_MIN 50 // 50-75%
+#define ROOM_SIZE_SMALL_MIN 25  // 25-50%
+
 #define ROOM_WIDTH_MIN_BOUND 0
 #define ROOM_WIDTH_MAX_BOUND (GRID_WIDTH - ROOM_MAX_SIZE)
 #define ROOM_HEIGHT_MIN_BOUND 0
@@ -53,7 +56,7 @@ typedef struct
 Room CreateRoom(int x, int y, int width, int height);
 bool IsRoomValid(int grid[GRID_HEIGHT][GRID_WIDTH], Room room);
 void PlaceRoom(int grid[GRID_HEIGHT][GRID_WIDTH], Room room, int roomId);
-void GenerateRooms(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int* roomCount);
+bool GenerateRooms(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int* roomCount);
 
 // Corridors
 typedef struct
@@ -78,7 +81,12 @@ void GenerateMazes(int grid[GRID_HEIGHT][GRID_WIDTH]);
 #define DOOR_NEXT_CHANCE_INITIAL 100
 #define DOOR_CHANCE_DECREASE 15
 
-void ConnectRoomsViaDoors(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int roomCount);
+bool ConnectRoomsViaDoors(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int roomCount);
 bool FindDoorPosition(int grid[GRID_HEIGHT][GRID_WIDTH], Room room, int* doorX, int* doorY);
+
+// Dungeon Generation
+bool GenerateDungeon(int grid[GRID_HEIGHT][GRID_WIDTH], int maxAttempts);
+void GenerateGrid(int grid[GRID_HEIGHT][GRID_WIDTH]);
+void PrintDungeon(int grid[GRID_HEIGHT][GRID_WIDTH]);
 
 #endif //DUNGEON_H

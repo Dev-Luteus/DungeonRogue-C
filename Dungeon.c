@@ -88,22 +88,60 @@ void PlaceRoom(int grid[GRID_HEIGHT][GRID_WIDTH], Room room, int roomId)
     }
 }
 
-void GenerateRooms(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int* roomCount)
+static int CalculateRoomSize(int minPercent, int maxPercent, int minSize, int maxSize)
+{
+    // I had to look this up but apparently dividing by 128 is faster than dividing by 100,
+    // Using bit shifts for division by powers of 2, is the idea
+    int range = maxSize - minSize;
+    int minValue = minSize + ((range * minPercent) >> 7);  // Divide by 128 (~100) (100%)
+    int maxValue = minSize + ((range * maxPercent) >> 7);
+
+    return GetRandomValue(minValue, maxValue);
+}
+
+bool GenerateRooms(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int* roomCount)
 {
     *roomCount = 0;
     int nextRoomId = ROOM_ID_START;
-    const int MAX_ATTEMPTS = 100; // per room
+    const int MAX_ATTEMPTS = 50;
+    const int ATTEMPTS_PER_ROOM = 20;
+    int failedAttempts = 0;
 
-    for (int i = 0; i < ROOM_AMOUNT; i++)
+    /* Here, I'm trying to make Room Placement more successful, by dividing rooms into tiers,
+     * So we can control how many rooms of which sizes are placed!
+     */
+    while (*roomCount < ROOM_AMOUNT && failedAttempts < MAX_ATTEMPTS)
     {
+        int width, height;
+
+        // Use bit shifts for division by powers of 2
+        const int quarterRooms = ROOM_AMOUNT >> 2;  // ROOM_AMOUNT / 4
+        const int halfRooms = ROOM_AMOUNT >> 1;     // ROOM_AMOUNT / 2
+
+        // Determine room size tier based on count
+        if (*roomCount < quarterRooms)  // First 25% of rooms
+        {
+            width = CalculateRoomSize(96, 128, ROOM_MIN_WIDTH, ROOM_MAX_SIZE);   // ~75-100%
+            height = CalculateRoomSize(96, 128, ROOM_MIN_HEIGHT, ROOM_MAX_SIZE);
+        }
+        else if (*roomCount < halfRooms)  // Next 25% of rooms
+        {
+            width = CalculateRoomSize(64, 96, ROOM_MIN_WIDTH, ROOM_MAX_SIZE);    // ~50-75%
+            height = CalculateRoomSize(64, 96, ROOM_MIN_HEIGHT, ROOM_MAX_SIZE);
+        }
+        else  // Remaining 50% of rooms
+        {
+            width = CalculateRoomSize(32, 64, ROOM_MIN_WIDTH, ROOM_MAX_SIZE);    // ~25-50%
+            height = CalculateRoomSize(32, 64, ROOM_MIN_HEIGHT, ROOM_MAX_SIZE);
+        }
+
         bool roomPlaced = false;
 
-        for (int attempt = 0; attempt < MAX_ATTEMPTS && !roomPlaced; attempt++)
+        // Try to place the room
+        for (int attempt = 0; attempt < ATTEMPTS_PER_ROOM && !roomPlaced; attempt++)
         {
-            const int width = GetRandomValue(ROOM_MIN_WIDTH, ROOM_MAX_SIZE);
-            const int height = GetRandomValue(ROOM_MIN_HEIGHT, ROOM_MAX_SIZE);
-            const int x = GetRandomValue(ROOM_WIDTH_MIN_BOUND, ROOM_WIDTH_MAX_BOUND);
-            const int y = GetRandomValue(ROOM_HEIGHT_MIN_BOUND, ROOM_HEIGHT_MAX_BOUND);
+            int x = GetRandomValue(ROOM_WIDTH_MIN_BOUND, ROOM_WIDTH_MAX_BOUND);
+            int y = GetRandomValue(ROOM_HEIGHT_MIN_BOUND, ROOM_HEIGHT_MAX_BOUND);
 
             Room room = CreateRoom(x, y, width, height);
 
@@ -114,9 +152,14 @@ void GenerateRooms(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int* roomCou
                 (*roomCount)++;
                 nextRoomId++;
                 roomPlaced = true;
+                failedAttempts = 0;  // Reset failed attempts on success
             }
         }
+
+        failedAttempts += !roomPlaced;  // Increment if room wasn't placed (using bool to int conversion)
     }
+
+    return *roomCount == ROOM_AMOUNT;
 }
 
 /* This is our general check if we can generate corridors on cells in the grid!
@@ -230,17 +273,19 @@ void RandomizedFloodFill(int grid[GRID_HEIGHT][GRID_WIDTH], int startX, int star
     }
 
     const int DIRECTION_BIAS_THRESHOLD = 30;  // 70% chance to continue in the same direction!
+    const int MAX_ITERATIONS = GRID_WIDTH * GRID_HEIGHT; // Allow enough iterations to fill the grid
+    int iterations = 0;
 
     // This is an attempt at a Growing-Tree Algorithm
-    while (stackSize > 0)
+    while (stackSize > 0 && iterations++ < MAX_ITERATIONS)
     {
-        // Get last corridor in the stack ( our most recently added ) 
+        // Get last corridor in the stack ( our most recently added )
         const Corridor current = stack[stackSize - 1];
 
         // Here, we find the valid directions
         bool foundValidDirection = false;
         int availableDirections[4];
-        int numValidDirections = 0; 
+        int numValidDirections = 0;
 
         // Check directions
         for (int d = 0; d < 4; d++)
@@ -315,6 +360,11 @@ void RandomizedFloodFill(int grid[GRID_HEIGHT][GRID_WIDTH], int startX, int star
         }
     }
 
+    if (iterations >= MAX_ITERATIONS)
+    {
+        printf("RandomizedFloodFill exceeded maximum iterations at (%d, %d)!\n", startX, startY);
+    }
+
     free(stack); // Free stack memory!
 }
 
@@ -350,14 +400,14 @@ void GenerateMazes(int grid[GRID_HEIGHT][GRID_WIDTH])
  * If we cannot, we try to place a door in a random direction, followed by a corridor cell.
  *
  */
-void ConnectRoomsViaDoors(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int roomCount)
+bool ConnectRoomsViaDoors(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int roomCount)
 {
     // calloc => runtime heap allocation, initializes 0 (false for bool)
     bool* hasConnection = (bool*)calloc(roomCount, sizeof(bool));
 
     if (hasConnection == NULL)
     {
-        return; // Allocation failed!
+        return false; // Allocation failed!
     }
 
     // Wall offsets for [checkX, checkY, doorX, doorY] in N-S-W-E order
@@ -527,7 +577,19 @@ void ConnectRoomsViaDoors(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int r
         }
     }
 
+    // Check if all rooms are connected before freeing memory!
+    bool allConnected = true;
+    for (int i = 0; i < roomCount; i++)
+    {
+        if (!hasConnection[i])
+        {
+            allConnected = false;
+            break;
+        }
+    }
+
     free(hasConnection);
+    return allConnected;
 }
 
 // Here, we define starting and end rooms for our pathfinding algorithm.
@@ -565,21 +627,37 @@ static bool InitializeRoomIndices(Room rooms[], int roomCount, int* startRoomInd
     return false;
 }
 
-void GenerateDungeon(int grid[GRID_HEIGHT][GRID_WIDTH])
+bool GenerateDungeon(int grid[GRID_HEIGHT][GRID_WIDTH], int maxAttempts)
 {
     Room rooms[ROOM_AMOUNT];
     int roomCount;
 
     GenerateGrid(grid);
-    GenerateRooms(grid, rooms, &roomCount);
+
+    if (!GenerateRooms(grid, rooms, &roomCount))
+    {
+        printf("Room generation failed\n");
+        return false;
+    }
+
     GenerateMazes(grid);
-    ConnectRoomsViaDoors(grid, rooms, roomCount);
+
+    if (!ConnectRoomsViaDoors(grid, rooms, roomCount))
+    {
+        printf("Door connection failed\n");
+        return false;
+    }
 
     int startRoomIndex, bossRoomIndex;
-    if (InitializeRoomIndices(rooms, roomCount, &startRoomIndex, &bossRoomIndex))
+    if (!InitializeRoomIndices(rooms, roomCount, &startRoomIndex, &bossRoomIndex))
     {
-        GeneratePaths(grid, rooms, roomCount, startRoomIndex, bossRoomIndex);
+        printf("Room indices initialization failed\n");
+        return false;
     }
+
+    GeneratePaths(grid, rooms, roomCount, startRoomIndex, bossRoomIndex);
+
+    return true;
 }
 
 /* Our main print function.
