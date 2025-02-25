@@ -8,7 +8,7 @@ int main(void)
     const int height = 1080;
 
     InitWindow(width, height, "Dungeon Rogue C!");
-    SetTargetFPS(400);
+    SetTargetFPS(200);
 
     Game game = InitGame(width, height);
 

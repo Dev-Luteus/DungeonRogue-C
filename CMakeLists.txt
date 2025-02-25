@@ -13,7 +13,9 @@ add_executable(DungeonRogue_C main.c
         Dungeon.c
         include/Dungeon.h
         Game.c
-        include/Game.h)
+        include/Game.h
+        GeneratePaths.c
+        include/GeneratePaths.h)
 
 # Link Raylib library (and required Windows libraries)
 target_link_libraries(DungeonRogue_C raylib winmm)

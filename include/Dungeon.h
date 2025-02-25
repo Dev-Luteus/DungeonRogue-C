@@ -7,13 +7,14 @@
 #define CELL_ROOM 2
 #define CELL_CORRIDOR 3
 #define CELL_DOOR 4
+#define CELL_PATH 5
 #define ROOM_ID_START 10 // ID 10 and Up
 
 // General
 // The Height and Width should be an ODD number
-#define GRID_HEIGHT 99
-#define GRID_WIDTH 99
-#define CELL_SIZE 10
+#define GRID_HEIGHT 79
+#define GRID_WIDTH 79
+#define CELL_SIZE 13
 #define GRID_TOTAL_HEIGHT GRID_HEIGHT * CELL_SIZE
 #define GRID_TOTAL_WIDTH GRID_WIDTH * CELL_SIZE
 
@@ -22,14 +23,14 @@ void GenerateDungeon(int grid[GRID_HEIGHT][GRID_WIDTH]);
 void PrintDungeon(int grid[GRID_HEIGHT][GRID_WIDTH]);
 
 // Rooms
-#define ROOM_MAX_SIZE 24
-#define ROOM_MIN_SIZE 12
-#define ROOM_MIN_WIDTH 8
-#define ROOM_MIN_HEIGHT 8
-#define ROOM_AMOUNT 16
+#define ROOM_MAX_SIZE 18
+#define ROOM_MIN_SIZE 9
+#define ROOM_MIN_WIDTH 7
+#define ROOM_MIN_HEIGHT 7
+#define ROOM_AMOUNT 14
 
 #define ROOM_BOUNDARY_PADDING 4
-#define ROOM_SPACING 4
+#define ROOM_SPACING 3
 
 typedef struct
 {
@@ -68,7 +69,8 @@ void GenerateMazes(int grid[GRID_HEIGHT][GRID_WIDTH]);
 #define DOOR_CHANCE_DECREASE 15
 
 void ConnectRoomsViaDoors(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int roomCount);
-bool ValidateRoomConnections(int grid[GRID_HEIGHT][GRID_WIDTH]);
-void RemoveDeadEndCorridors(int grid[GRID_HEIGHT][GRID_WIDTH]);
+
+// Paths
+bool FindDoorPosition(int grid[GRID_HEIGHT][GRID_WIDTH], Room room, int* doorX, int* doorY);
 
 #endif //DUNGEON_H

@@ -2,7 +2,10 @@
 #include "Dungeon.h"
 
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
+
+#include "GeneratePaths.h"
 
 /* In this loop we make a simple 2d grid
  * We then colour the grid based on the XOR AND of x and y */
@@ -346,20 +349,42 @@ void ConnectRoomsViaDoors(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int r
         {x, 0, d, 0}       // E
     };
 
-    for (int i = 0; i < roomCount; ++i)
+    // Grid center points for directional biasing
+    const int centerX = GRID_WIDTH / 2;
+    const int centerY = GRID_HEIGHT / 2;
+
+    for (int roomIndex = 0; roomIndex < roomCount; ++roomIndex)
     {
         // Prevent multiple connections
-        if (hasConnection[i])
+        if (hasConnection[roomIndex])
         {
             continue;
         }
 
         // Get current room
-        Room room = rooms[i];
+        Room room = rooms[roomIndex];
         bool doorPlaced = false;
 
-        for (int wall = 0; wall < 4 && !doorPlaced; wall++)
+        // Calculate room center for directional bias
+        int roomCenterX = room.x + (room.width / 2);
+        int roomCenterY = room.y + (room.height / 2);
+
+        /* Direction biasing based on room position:
+         * Remember: Y-axis is inverted in computer graphics (0 at top, increases downward)
+         * If room is above center (Y < centerY) => Start with North (0) because it's closer to top
+         * If room is below center (Y > centerY) => Start with South (1) because it's closer to bottom
+         * For X axis: Prefer East if room is left of center, West if right of center
+         */
+        int startWall = (roomCenterY < centerY) ? 0 : 1;  // North : South
+        int wallOrder[4] = {startWall, (startWall + 1) % 2};  // First try N/S pair based on Y position
+
+        // Then add E/W based on X position
+        wallOrder[2] = (roomCenterX < centerX) ? 3 : 2;  // East : West
+        wallOrder[3] = (wallOrder[2] == 2) ? 3 : 2;      // Complete the pair
+
+        for (int wallIndex = 0; wallIndex < 4 && !doorPlaced; wallIndex++)
         {
+            int wall = wallOrder[wallIndex];
             /* wall = 0 (North) or wall = 1 (South) -> horizontal movement ( <---> )
              * wall = 2 (West) or wall = 3 (East) -> vertical movement ( | )
              */
@@ -408,7 +433,7 @@ void ConnectRoomsViaDoors(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int r
                     }
 
                     grid[finalY + walls[wall][3]][finalX + walls[wall][2]] = CELL_DOOR;
-                    hasConnection[i] = true;
+                    hasConnection[roomIndex] = true;
                     doorPlaced = true;
                 }
             }
@@ -432,9 +457,9 @@ void ConnectRoomsViaDoors(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int r
             }
 
             // Try each direction
-            for (int i = 0; i < 4 && !doorPlaced; i++)
+            for (int dirIndex = 0; dirIndex < 4 && !doorPlaced; dirIndex++)
             {
-                int wall = directions[i];
+                int wall = directions[dirIndex];
                 bool isHorizontal = wall < 2;
 
                 // Pick random position along the wall
@@ -459,14 +484,50 @@ void ConnectRoomsViaDoors(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int r
                     {
                         grid[doorY][doorX] = CELL_DOOR;
                         grid[corridorY][corridorX] = CELL_CORRIDOR;
-                        hasConnection[i] = true;
+                        hasConnection[roomIndex] = true;
                         doorPlaced = true;
                     }
                 }
             }
         }
     }
+
     free(hasConnection);
+}
+
+// Here, we define starting and end rooms for our pathfinding algorithm.
+static bool InitializeRoomIndices(Room rooms[], int roomCount, int* startRoomIndex, int* bossRoomIndex)
+{
+    Room startRoom = FindStartingRoom(rooms, roomCount);
+    Room bossRoom = FindBossRoom(rooms, roomCount);
+
+    *startRoomIndex = -1;
+    *bossRoomIndex = -1;
+
+    // Find the matching room indices
+    for (int i = 0; i < roomCount; i++)
+    {
+        if (rooms[i].x == startRoom.x && rooms[i].y == startRoom.y &&
+            rooms[i].width == startRoom.width && rooms[i].height == startRoom.height)
+        {
+            *startRoomIndex = i;
+        }
+
+        if (rooms[i].x == bossRoom.x && rooms[i].y == bossRoom.y &&
+            rooms[i].width == bossRoom.width && rooms[i].height == bossRoom.height)
+        {
+            *bossRoomIndex = i;
+        }
+    }
+
+    // Return success/failure status
+    if (*startRoomIndex != -1 && *bossRoomIndex != -1)
+    {
+        return true;
+    }
+
+    printf("Failed to find start or boss room indices!\n");
+    return false;
 }
 
 void GenerateDungeon(int grid[GRID_HEIGHT][GRID_WIDTH])
@@ -478,6 +539,12 @@ void GenerateDungeon(int grid[GRID_HEIGHT][GRID_WIDTH])
     GenerateRooms(grid, rooms, &roomCount);
     GenerateMazes(grid);
     ConnectRoomsViaDoors(grid, rooms, roomCount);
+
+    int startRoomIndex, bossRoomIndex;
+    if (InitializeRoomIndices(rooms, roomCount, &startRoomIndex, &bossRoomIndex))
+    {
+        GeneratePaths(grid, rooms, roomCount, startRoomIndex, bossRoomIndex);
+    }
 }
 
 /* Our main print function.
@@ -517,6 +584,10 @@ void PrintDungeon(int grid[GRID_HEIGHT][GRID_WIDTH])
 
                     case CELL_DOOR:
                         DrawRectangle(drawX, drawY, CELL_SIZE, CELL_SIZE, RED);
+                    break;
+
+                    case CELL_PATH:
+                        DrawRectangle(drawX, drawY, CELL_SIZE, CELL_SIZE, SKYBLUE);
                     break;
                 }
             }
