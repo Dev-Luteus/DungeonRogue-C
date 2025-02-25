@@ -410,15 +410,28 @@ void ConnectRoomsViaDoors(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int r
                  */
                 if (grid[y + walls[wall][1]][x + walls[wall][0]] == CELL_CORRIDOR)
                 {
-                    // Here, I'm introducing randomness to door placement
+                    // Force check of the next cell first
+                    int nextX = x + (isHorizontal ? 1 : 0);
+                    int nextY = y + (isHorizontal ? 0 : 1);
+
+                    // If next cell is valid and also a corridor, use it as starting point
+                    if (pos + 1 < length &&
+                        grid[nextY + walls[wall][1]][nextX + walls[wall][0]] == CELL_CORRIDOR)
+                    {
+                        x = nextX;
+                        y = nextY;
+                        pos++; // Update position counter
+                    }
+
+                    // Now start the chance-based scanning from this position
                     int chance = DOOR_NEXT_CHANCE_INITIAL;
                     int finalX = x;
                     int finalY = y;
 
                     while (pos + 1 < length && GetRandomValue(0, 100) < chance)
                     {
-                        int nextX = finalX + (isHorizontal ? 1 : 0);
-                        int nextY = finalY + (isHorizontal ? 0 : 1);
+                        nextX = finalX + (isHorizontal ? 1 : 0);
+                        nextY = finalY + (isHorizontal ? 0 : 1);
 
                         if (grid[nextY + walls[wall][1]][nextX + walls[wall][0]] == CELL_CORRIDOR)
                         {
