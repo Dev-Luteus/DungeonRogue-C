@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "GeneratePaths.h"
 
@@ -424,6 +425,7 @@ bool ConnectRoomsViaDoors(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int r
     // Grid center points for directional biasing
     const int centerX = GRID_WIDTH / 2;
     const int centerY = GRID_HEIGHT / 2;
+    const int topThird = GRID_HEIGHT / 3;
 
     for (int roomIndex = 0; roomIndex < roomCount; ++roomIndex)
     {
@@ -454,6 +456,9 @@ bool ConnectRoomsViaDoors(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int r
         wallOrder[2] = (roomCenterX < centerX) ? 3 : 2;  // East : West
         wallOrder[3] = (wallOrder[2] == 2) ? 3 : 2;      // Complete the pair
 
+        // Check if room is in the top third of the grid for south preference
+        bool preferSouth = room.y < topThird;
+
         for (int wallIndex = 0; wallIndex < 4 && !doorPlaced; wallIndex++)
         {
             int wall = wallOrder[wallIndex];
@@ -480,6 +485,40 @@ bool ConnectRoomsViaDoors(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int r
                  * So, we check the grid cell that's offset from our current (x,y) position,
                  * by the amounts stored in the walls array
                  */
+
+                // First, try extended corridor placement for rooms near the top
+                if (preferSouth && wall == 1)  // South wall for top rooms
+                {
+                    int doorX = x + walls[wall][2];
+                    int doorY = y + walls[wall][3];
+                    int corridorX = x + walls[wall][0];
+                    int corridorY = y + walls[wall][1];
+                    int extraCorridorY = corridorY + 1;
+
+                    if (IS_IN_GRID(doorX, doorY) &&
+                        IS_IN_GRID(corridorX, corridorY) &&
+                        IS_IN_GRID(corridorX, extraCorridorY))
+                    {
+                        if ((grid[doorY][doorX] == CELL_EMPTY_1 || grid[doorY][doorX] == CELL_EMPTY_2) &&
+                            (grid[corridorY][corridorX] == CELL_EMPTY_1 || grid[corridorY][corridorX] == CELL_EMPTY_2) &&
+                            (grid[extraCorridorY][corridorX] == CELL_CORRIDOR ||
+                             grid[extraCorridorY][corridorX] == CELL_EMPTY_1 ||
+                             grid[extraCorridorY][corridorX] == CELL_EMPTY_2))
+                        {
+                            grid[doorY][doorX] = CELL_DOOR;
+                            grid[corridorY][corridorX] = CELL_CORRIDOR;
+                            if (grid[extraCorridorY][corridorX] != CELL_CORRIDOR)
+                            {
+                                grid[extraCorridorY][corridorX] = CELL_CORRIDOR;
+                            }
+                            hasConnection[roomIndex] = true;
+                            doorPlaced = true;
+                            continue;
+                        }
+                    }
+                }
+
+                // Regular corridor check if extended placement failed
                 if (grid[y + walls[wall][1]][x + walls[wall][0]] == CELL_CORRIDOR)
                 {
                     // Force check of the next cell first
@@ -701,7 +740,7 @@ void PrintDungeon(int grid[GRID_HEIGHT][GRID_WIDTH])
                     break;
 
                     case CELL_PATH:
-                        DrawRectangle(drawX, drawY, CELL_SIZE, CELL_SIZE, SKYBLUE);
+                        DrawRectangle(drawX, drawY, CELL_SIZE, CELL_SIZE, GREEN);
                     break;
                 }
             }

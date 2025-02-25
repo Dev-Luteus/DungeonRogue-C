@@ -12,9 +12,9 @@
 
 // General
 // The Height and Width should be an ODD number
-#define GRID_HEIGHT 79
-#define GRID_WIDTH 79
-#define CELL_SIZE 13
+#define GRID_HEIGHT 69
+#define GRID_WIDTH 69
+#define CELL_SIZE 15
 #define GRID_TOTAL_HEIGHT (GRID_HEIGHT * CELL_SIZE)
 #define GRID_TOTAL_WIDTH (GRID_WIDTH * CELL_SIZE)
 
@@ -27,13 +27,13 @@
 #define IS_EMPTY(cell) ((cell) == CELL_EMPTY_1 || (cell) == CELL_EMPTY_2)
 
 // Rooms
-#define ROOM_MAX_SIZE 16
-#define ROOM_MIN_SIZE 9
-#define ROOM_MIN_WIDTH 7
-#define ROOM_MIN_HEIGHT 7
-#define ROOM_AMOUNT 12
+#define ROOM_MAX_SIZE 12
+#define ROOM_MIN_SIZE 5
+#define ROOM_MIN_WIDTH 5
+#define ROOM_MIN_HEIGHT 5
+#define ROOM_AMOUNT 16
 #define ROOM_BOUNDARY_PADDING 4
-#define ROOM_SPACING 3
+#define ROOM_SPACING 4
 
 // Room Size Tiers
 #define ROOM_SIZE_LARGE_MIN 75  // 75-100%
