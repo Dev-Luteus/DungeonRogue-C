@@ -93,40 +93,21 @@ Room FindBossRoom(Room rooms[], int roomCount)
 // Here, we iterate over the room perimeter and find the door position!
 bool FindDoorPosition(int grid[GRID_HEIGHT][GRID_WIDTH], Room room, int* doorX, int* doorY)
 {
-    // Check top and bottom edges
-    for (int x = room.x - 1; x <= room.x + room.width; x++)
+    for (int y = room.y - 1; y <= room.y + room.height; y++)
     {
-        if (grid[room.y - 1][x] == CELL_DOOR)
+        for (int x = room.x - 1; x <= room.x + room.width; x++)
         {
-            *doorX = x;
-            *doorY = room.y - 1;
-            return true;
-        }
-        if (grid[room.y + room.height][x] == CELL_DOOR)
-        {
-            *doorX = x;
-            *doorY = room.y + room.height;
-            return true;
+            if (grid[y][x] == CELL_DOOR)
+            {
+                *doorX = x;
+                *doorY = y;
+
+                return true;
+            }
         }
     }
 
-    // Check left and right edges
-    for (int y = room.y; y < room.y + room.height; y++)
-    {
-        if (grid[y][room.x - 1] == CELL_DOOR)
-        {
-            *doorX = room.x - 1;
-            *doorY = y;
-            return true;
-        }
-        if (grid[y][room.x + room.width] == CELL_DOOR)
-        {
-            *doorX = room.x + room.width;
-            *doorY = y;
-            return true;
-        }
-    }
-
+    // should never happen but just in case
     printf("No door found for room at (%d, %d)!\n", room.x, room.y);
     return false;
 }
@@ -192,10 +173,35 @@ static bool InitializePathfinding(bool** connected, Corridor** queue, bool** vis
     return true;
 }
 
+/* This is a Helper function intended to ensure that vertical and horizontal paths are placed correctly,
+ * We don't want to create corridors that are 2 cells wide!
+ */
+static bool IsValidPathPlacement(int grid[GRID_HEIGHT][GRID_WIDTH], int x, int y, bool isVertical)
+{
+    // Check all adjacent cells (up, right, down, left)
+    static const int dx[] = {0, 1, 0, -1};
+    static const int dy[] = {-1, 0, 1, 0};
+
+    for (int dir = 0; dir < 4; dir++)
+    {
+        int checkX = x + dx[dir];
+        int checkY = y + dy[dir];
+
+        if (IS_VALID_CELL(checkX, checkY) && grid[checkY][checkX] == CELL_PATH)
+        {
+            bool checkIsVertical = (dx[dir] == 0); // If dx is 0, it's a vertical path
+            if (isVertical == checkIsVertical)
+            {
+                return false; // Found same orientation adjacent
+            }
+        }
+    }
+    return true;
+}
+
 /* Our main pathfinding function,
  * This function is inspired and uses a modification of Prim's Algorithm and Breadth's First Search,
- * We calculate the direct distance between two doors, and set a maximum allowed path length,
- * We also make sure to not create paths that are too straight, and only optimize them by 30% in comparison to the maze
+ * We calculate the direct distance between two doors, etc..
  */
 static bool FindPathBetweenDoors(int grid[GRID_HEIGHT][GRID_WIDTH],
     Corridor currentDoor, int nextDoorX, int nextDoorY,
@@ -204,7 +210,13 @@ static bool FindPathBetweenDoors(int grid[GRID_HEIGHT][GRID_WIDTH],
     // Calculate direct distance and maximum allowed path length
     int directDistance = abs(nextDoorX - currentDoor.x) + abs(nextDoorY - currentDoor.y);
     int maxAllowedLength = (int)(directDistance * PATH_LENGTH_THRESHOLD);
-    int maxNewPaths = (int)(maxAllowedLength * 0.7f);
+
+    /* We limit new path creation to exactly 4 cells maximum.
+     * This forces the algorithm to heavily prioritize existing corridors and paths,
+     * while still allowing small detours when necessary.
+     */
+    const int MAX_NEW_PATH_CELLS = 4;
+    int maxNewPaths = MAX_NEW_PATH_CELLS;
 
     // Set byte size to 0 every time we reset paths! also faster than a loop!
     memset(visited, 0, GRID_SIZE * sizeof(bool));
@@ -232,6 +244,7 @@ static bool FindPathBetweenDoors(int grid[GRID_HEIGHT][GRID_WIDTH],
 
             bool canExtend = false;
             bool isNewPath = false;
+            bool isVerticalMove = (dirX[i] == 0); // If moving up/down
 
             for (int scout = 1; scout <= CELL_SCOUT_AMOUNT; scout++)
             {
@@ -262,7 +275,8 @@ static bool FindPathBetweenDoors(int grid[GRID_HEIGHT][GRID_WIDTH],
                     else if (CAN_BE_PATH(grid[newY][newX]) &&
                             grid[newY][newX] != CELL_DOOR &&
                             queueBack < maxAllowedLength &&
-                            newPathCount < maxNewPaths)
+                            newPathCount < MAX_NEW_PATH_CELLS &&
+                            IsValidPathPlacement(grid, newX, newY, isVerticalMove))
                     {
                         canExtend = true;
                         isNewPath = true;
