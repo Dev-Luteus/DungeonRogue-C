@@ -41,19 +41,23 @@ bool GenerateFloor(Game* game)
                    game->currentFloor, game->generationAttempts);
 
             // Find player start position (should be in the start room)
-            for (int i = 0; i < game->roomCount; i++) {
-                if (game->rooms[i].type == ROOM_TYPE_START) {
-                    // Place player in center of start room
+            for (int i = 0; i < game->roomCount; i++)
+            {
+                if (game->rooms[i].type == ROOM_TYPE_START)
+                {
                     game->playerPos.x = game->rooms[i].x + (game->rooms[i].width / 2);
                     game->playerPos.y = game->rooms[i].y + (game->rooms[i].height / 2);
+
                     return true;
                 }
             }
 
             // Fallback position if no start room was found
-            if (game->roomCount > 0) {
+            if (game->roomCount > 0)
+            {
                 game->playerPos.x = game->rooms[0].x + (game->rooms[0].width / 2);
                 game->playerPos.y = game->rooms[0].y + (game->rooms[0].height / 2);
+
                 return true;
             }
         }
@@ -61,6 +65,7 @@ bool GenerateFloor(Game* game)
 
     printf("Failed to generate floor %d after %d attempts\n",
            game->currentFloor, MAX_GENERATION_ATTEMPTS);
+
     return false;
 }
 
@@ -135,14 +140,14 @@ void UpdateGame(Game* game)
                     game->playerPos.x = x;
                     game->playerPos.y = y;
                     GoUpStairs(game);
+
                     return;
                 }
             }
         }
     }
 
-    // In a real game, you'd check if the player is standing on stairs
-    // and only trigger floor transitions when the player presses an action key
+    // Our player doesn't exist yet but I wanted to leave this here if I pursue this further in the future
     /*
     if (playerCell == CELL_STAIR_DOWN && IsKeyPressed(KEY_SPACE)) {
         GoDownStairs(game);
@@ -159,26 +164,26 @@ void DrawGame (Game game)
         ClearBackground(RAYWHITE);
         PrintDungeon(game.grid, game.rooms, game.roomCount);
 
-        // Draw player as a yellow circle
+        // Draw player as a yellow circle ( just for illustration purposes )
         const int totalHeight = GRID_TOTAL_HEIGHT;
         const int totalWidth = GRID_TOTAL_WIDTH;
         const int startX = CENTER_SCREEN_X(totalWidth);
         const int startY = CENTER_SCREEN_Y(totalHeight);
 
-        DrawCircle(
+        DrawCircle
+        (
             startX + (game.playerPos.x * CELL_SIZE) + CELL_SIZE / 2,
             startY + (game.playerPos.y * CELL_SIZE) + CELL_SIZE / 2,
             CELL_SIZE / 3,
             YELLOW
         );
 
-        // Draw floor number
         char floorText[20];
         sprintf(floorText, "Floor: %d", game.currentFloor);
-        DrawText(floorText, 10, 10, 20, BLACK);
+        DrawText(floorText, 40, 40, 30, BLACK);
 
         // Draw help text
-        DrawText("Press UP/DOWN keys to change floors", 10, 40, 16, DARKGRAY);
+        DrawText("UP/DOWN to change floors", 40, 100, 26, DARKGRAY);
     }
     EndDrawing();
 }
