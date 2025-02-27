@@ -19,6 +19,9 @@ Game InitGame(int width, int height)
         .transitioningFloors = false
     };
 
+    // placeholder player
+    game.player = InitPlayer(0, 0, CELL_SIZE / 2, CELL_SIZE / 2, YELLOW);
+
     return game;
 }
 

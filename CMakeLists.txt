@@ -25,6 +25,8 @@ add_executable(DungeonRogue_C main.c
         Door.c
         include/Staircase.h
         include/DungeonDefs.h
+        include/Player.h
+        Player.c
 )
 
 # Link Raylib library (and required Windows libraries)

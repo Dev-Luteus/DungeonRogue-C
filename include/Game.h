@@ -4,6 +4,7 @@
 #include "DungeonDefs.h"
 #include "Room.h"
 #include "Corridor.h"
+#include "Player.h"
 
 typedef struct
 {
@@ -20,6 +21,8 @@ typedef struct
     bool transitioningFloors;
     Room rooms[ROOM_AMOUNT];
     int roomCount;
+
+    Player player;
 } Game;
 
 Game InitGame(int width, int height);
