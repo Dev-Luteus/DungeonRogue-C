@@ -1,28 +1,13 @@
-﻿#include "GeneratePaths.h"
-
+﻿#include "Path.h"
 #include <raylib.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "Door.h"
 
 static const int dirX[] = { 0, 1, 0, -1 };
 static const int dirY[] = { -1, 0, 1, 0 };
-
-// Static just to encapsulate these functions, essentially C# private
-// Helper function to return the Manhattan distance between two rooms!
-static int GetRoomDistance(Room a, Room b)
-{
-    /* This used to use division, but I learned that Bit Shifts are faster
-     * Makes sense, we can prevent a more expensive calculation!
-     */
-    int centerAX = a.x + (a.width >> 1);
-    int centerAY = a.y + (a.height >> 1);
-    int centerBX = b.x + (b.width >> 1);
-    int centerBY = b.y + (b.height >> 1);
-
-    return abs(centerAX - centerBX) + abs(centerAY - centerBY);
-}
 
 /* While theorizing about the dungeon,
  * The idea here is for every room to only connect to one other room,
@@ -38,7 +23,13 @@ static int FindClosestRoom(Room rooms[], int roomCount, bool connected[], int cu
     {
         if (!connected[i] && i != currentRoom)
         {
-            int distance = GetRoomDistance(rooms[currentRoom], rooms[i]);
+            int distance = 0;
+            int centerAX = rooms[currentRoom].x + (rooms[currentRoom].width >> 1);
+            int centerAY = rooms[currentRoom].y + (rooms[currentRoom].height >> 1);
+            int centerBX = rooms[i].x + (rooms[i].width >> 1);
+            int centerBY = rooms[i].y + (rooms[i].height >> 1);
+
+            distance = abs(centerAX - centerBX) + abs(centerAY - centerBY);
 
             if (distance < closestDistance)
             {
@@ -49,67 +40,6 @@ static int FindClosestRoom(Room rooms[], int roomCount, bool connected[], int cu
     }
 
     return closestRoom;
-}
-
-// Not static, since Dungeon.C needs to use this
-Room FindStartingRoom(Room rooms[], int roomCount)
-{
-    int smallestIndex = 0;
-    int smallestArea = rooms[0].width * rooms[0].height;
-
-    for (int i = 1; i < roomCount; i++)
-    {
-        int area = rooms[i].width * rooms[i].height;
-
-        if (area < smallestArea)
-        {
-            smallestArea = area;
-            smallestIndex = i;
-        }
-    }
-
-    return rooms[smallestIndex];
-}
-
-Room FindBossRoom(Room rooms[], int roomCount)
-{
-    int largestIndex = 0;
-    int largestArea = rooms[0].width * rooms[0].height;
-
-    for (int i = 1; i < roomCount; i++)
-    {
-        int area = rooms[i].width * rooms[i].height;
-
-        if (area > largestArea)
-        {
-            largestArea = area;
-            largestIndex = i;
-        }
-    }
-
-    return rooms[largestIndex];
-}
-
-// Here, we iterate over the room perimeter and find the door position!
-bool FindDoorPosition(int grid[GRID_HEIGHT][GRID_WIDTH], Room room, int* doorX, int* doorY)
-{
-    for (int y = room.y - 1; y <= room.y + room.height; y++)
-    {
-        for (int x = room.x - 1; x <= room.x + room.width; x++)
-        {
-            if (grid[y][x] == CELL_DOOR)
-            {
-                *doorX = x;
-                *doorY = y;
-
-                return true;
-            }
-        }
-    }
-
-    // should never happen but just in case
-    printf("No door found for room at (%d, %d)!\n", room.x, room.y);
-    return false;
 }
 
 /* Our initialization settings for pathfinding,

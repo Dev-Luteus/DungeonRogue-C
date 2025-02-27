@@ -14,8 +14,17 @@ add_executable(DungeonRogue_C main.c
         include/Dungeon.h
         Game.c
         include/Game.h
-        GeneratePaths.c
-        include/GeneratePaths.h
+        Path.c
+        include/Path.h
+        Staircase.c
+        include/Room.h
+        Room.c
+        include/Corridor.h
+        Corridor.c
+        include/Door.h
+        Door.c
+        include/Staircase.h
+        include/DungeonDefs.h
 )
 
 # Link Raylib library (and required Windows libraries)
