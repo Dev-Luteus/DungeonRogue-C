@@ -150,7 +150,7 @@ bool ConnectRoomsViaDoors(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int r
                             // Here, we add connecting corridors if necessary!
                             if (corridorDistance > 1)
                             {
-                                // ? : because, sometimes corridors 3 cells away aren't properly connected ^^ 
+                                // ? : because, sometimes corridors 3 cells away aren't properly connected ^^
                                 int dirX = (corridorX == doorX) ? 0 : ((corridorX > doorX) ? 1 : -1);
                                 int dirY = (corridorY == doorY) ? 0 : ((corridorY > doorY) ? 1 : -1);
 

@@ -6,35 +6,49 @@
 #include <string.h>
 #include "Door.h"
 
+/* Direction vectors for cardinal movement (N, E, S, W)
+ * These vectors allow us to explore adjacent cells in the grid
+ * by adding these offsets to our current position
+ */
 static const int dirX[] = { 0, 1, 0, -1 };
 static const int dirY[] = { -1, 0, 1, 0 };
 
 /* While theorizing about the dungeon,
- * The idea here is for every room to only connect to one other room,
+ * The idea here is for every room to only connect to one other room, ( I might add exceptions )
  * So each room finds its closest room, and connects only to it.
  * If RoomA is connected to RoomB, it means RoomB must now find its closest room, and connect to it!
+ *
+ * We do this first by calculating distances between doors of each room, which act as a Connection point.
+ * We then implement a nearest-neighbor search using the Manhattan distance formula:
+ * (|x1-x2| + |y1-y2|)
+ *
+ * This in turn represents the total path distance in our grid!
  */
-static int FindClosestRoom(Room rooms[], int roomCount, bool connected[], int currentRoom)
+static int FindClosestRoomByDoors(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[],
+                                  int roomCount, bool connected[], int currentRoom,
+                                  int currentDoorX, int currentDoorY)
 {
     int closestRoom = -1;
     int closestDistance = INT_MAX;
 
+    // We skip the boss room since I want it to be connected last
     for (int i = 0; i < roomCount; ++i)
     {
         if (!connected[i] && i != currentRoom)
         {
-            int distance = 0;
-            int centerAX = rooms[currentRoom].x + (rooms[currentRoom].width >> 1);
-            int centerAY = rooms[currentRoom].y + (rooms[currentRoom].height >> 1);
-            int centerBX = rooms[i].x + (rooms[i].width >> 1);
-            int centerBY = rooms[i].y + (rooms[i].height >> 1);
+            int nextDoorX, nextDoorY;
 
-            distance = abs(centerAX - centerBX) + abs(centerAY - centerBY);
-
-            if (distance < closestDistance)
+            // Find the door of the candidate room
+            if (FindDoorPosition(grid, rooms[i], &nextDoorX, &nextDoorY))
             {
-                closestDistance = distance;
-                closestRoom = i;
+                // Calculate Manhattan distance between doors
+                int doorDistance = abs(nextDoorX - currentDoorX) + abs(nextDoorY - currentDoorY);
+
+                if (doorDistance < closestDistance)
+                {
+                    closestDistance = doorDistance;
+                    closestRoom = i;
+                }
             }
         }
     }
@@ -44,8 +58,7 @@ static int FindClosestRoom(Room rooms[], int roomCount, bool connected[], int cu
 
 /* Our initialization settings for pathfinding,
  * We allocate memory for connected rooms, queue, visited cells, and previous cells,
- * We also find the starting room's door position for path generation,
- * And later use this to generate our path between doors
+ * We also find the starting room's door position to begin our pathfinding =)
  */
 static bool InitializePathfinding(bool** connected, Corridor** queue, bool** visited,
     Corridor** previous, int roomCount, int* startDoorX, int* startDoorY,
@@ -89,7 +102,6 @@ static bool InitializePathfinding(bool** connected, Corridor** queue, bool** vis
         return false;
     }
 
-    // Find starting room's door - our entry point for path generation
     if (!FindDoorPosition(grid, rooms[startRoomIndex], startDoorX, startDoorY))
     {
         printf("No door found for starting room!\n");
@@ -97,41 +109,221 @@ static bool InitializePathfinding(bool** connected, Corridor** queue, bool** vis
         free(*queue);
         free(*visited);
         free(*previous);
+
         return false;
     }
 
     return true;
 }
 
-/* This is a Helper function intended to ensure that vertical and horizontal paths are placed correctly,
- * We don't want to create corridors that are 2 cells wide!
+/* Here, we check if a potential path cell would connect two separate corridor networks
+ * The idea here is that we want to winding paths and confusing corridors,
+ * Hence, we want much of the maze to remain the same!
+ *
+ * We're only trying  to "connect the seams", so that no room or mazes are unconnected.
+ * Everything must be traversable!
+ *
+ * To do this, this function counts the number of distinct corridor networks surrounding the cell.
+ * A valid "seam connector" should connect at least two separate networks.
  */
-static bool IsValidPathPlacement(int grid[GRID_HEIGHT][GRID_WIDTH], int x, int y, bool isVertical)
+static bool ConnectsDistinctCorridors(int grid[GRID_HEIGHT][GRID_WIDTH], int x, int y)
 {
-    // Check all adjacent cells (up, right, down, left)
-    static const int dx[] = {0, 1, 0, -1};
-    static const int dy[] = {-1, 0, 1, 0};
+    // Track adjacent positions that belong to corridors/paths
+    bool hasCorridorN = false;
+    bool hasCorridorS = false;
+    bool hasCorridorE = false;
+    bool hasCorridorW = false;
 
-    for (int dir = 0; dir < 4; dir++)
+    // Check each cardinal direction
+    if (IS_IN_GRID(x, y-1) && (grid[y-1][x] == CELL_CORRIDOR || grid[y-1][x] == CELL_PATH))
     {
-        int checkX = x + dx[dir];
-        int checkY = y + dy[dir];
+        hasCorridorN = true;
+    }
 
-        if (IS_VALID_CELL(checkX, checkY) && grid[checkY][checkX] == CELL_PATH)
+    if (IS_IN_GRID(x, y+1) && (grid[y+1][x] == CELL_CORRIDOR || grid[y+1][x] == CELL_PATH))
+    {
+        hasCorridorS = true;
+    }
+
+    if (IS_IN_GRID(x+1, y) && (grid[y][x+1] == CELL_CORRIDOR || grid[y][x+1] == CELL_PATH))
+    {
+        hasCorridorE = true;
+    }
+
+    if (IS_IN_GRID(x-1, y) && (grid[y][x-1] == CELL_CORRIDOR || grid[y][x-1] == CELL_PATH))
+    {
+        hasCorridorW = true;
+    }
+
+    // Calculate north-south and east-west connections
+    bool connectsNS = hasCorridorN && hasCorridorS;
+    bool connectsEW = hasCorridorE && hasCorridorW;
+
+    // Also check for L-shaped connections (exactly two adjacent corridors that aren't opposite)
+    bool lConnection = ((hasCorridorN && hasCorridorE) ||
+                       (hasCorridorN && hasCorridorW) ||
+                       (hasCorridorS && hasCorridorE) ||
+                       (hasCorridorS && hasCorridorW));
+
+    // Return true if this cell creates an efficient corridor connection
+    return connectsNS || connectsEW || lConnection;
+}
+
+/* This is a helper function which checks if a position (for path cells) is adjacent rooms.
+ * We do this because we don't want parallel or wide corridors!
+ */
+static bool IsAdjacentToRoom(int grid[GRID_HEIGHT][GRID_WIDTH], int x, int y)
+{
+    //
+    for (int dy = -1; dy <= 1; dy++)
+    {
+        for (int dx = -1; dx <= 1; dx++)
         {
-            bool checkIsVertical = (dx[dir] == 0); // If dx is 0, it's a vertical path
-            if (isVertical == checkIsVertical)
+            if (dx == 0 && dy == 0)
             {
-                return false; // Found same orientation adjacent
+                continue;
+            }
+
+            int checkX = x + dx;
+            int checkY = y + dy;
+
+            if (IS_IN_GRID(checkX, checkY) && IS_ROOM(grid[checkY][checkX]))
+            {
+                return true;
             }
         }
     }
+    return false;
+}
+
+/* This is another helper function that checks if placing a path cell would create a 2x2
+ * This hasn't quite happened before until now, but, in the case that it does I don't want it.
+ * It might be a redundant check, but I do this for qualitative reasons!
+ *
+ * Henceforth, This function examines all possible 2×2 patterns containing our target cell.
+ */
+static bool WouldCreate2x2Area(int grid[GRID_HEIGHT][GRID_WIDTH], int x, int y)
+{
+    // Check all possible 2×2 patterns containing (x,y)
+    for (int cornerY = y - 1; cornerY <= y; cornerY++)
+    {
+        for (int cornerX = x - 1; cornerX <= x; cornerX++)
+        {
+            // Skip if any part of the 2×2 area is outside the grid
+            if (!IS_IN_GRID(cornerX, cornerY) ||
+                !IS_IN_GRID(cornerX + 1, cornerY) ||
+                !IS_IN_GRID(cornerX, cornerY + 1) ||
+                !IS_IN_GRID(cornerX + 1, cornerY + 1))
+            {
+                continue;
+            }
+
+            // Count how many cells in this 2×2 area would be pathable
+            int pathableCount = 0;
+
+            // Check each cell in the 2×2 area
+            for (int dy = 0; dy <= 1; dy++)
+            {
+                for (int dx = 0; dx <= 1; dx++)
+                {
+                    int checkX = cornerX + dx;
+                    int checkY = cornerY + dy;
+
+                    // The cell we're considering placing
+                    if (checkX == x && checkY == y)
+                    {
+                        pathableCount++;
+                        continue;
+                    }
+
+                    // Existing pathable cells
+                    if (grid[checkY][checkX] == CELL_CORRIDOR ||
+                        grid[checkY][checkX] == CELL_PATH)
+                    {
+                        pathableCount++;
+                    }
+                }
+            }
+
+            // If all 4 cells would be pathable, this creates a 2×2 area
+            if (pathableCount == 4)
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+/* A simple validator helper function */
+static bool IsValidPathPlacement(int grid[GRID_HEIGHT][GRID_WIDTH], int x, int y)
+{
+    if (IsAdjacentToRoom(grid, x, y))
+    {
+        return false;
+    }
+
+    if (WouldCreate2x2Area(grid, x, y))
+    {
+        return false;
+    }
+
     return true;
 }
 
-/* Our main pathfinding function,
- * This function is inspired and uses a modification of Prim's Algorithm and Breadth's First Search,
- * We calculate the direct distance between two doors, etc..
+/* This is a weighted function that prioritizes directions toward the target door!
+ * It implements a 'Manhattan distance heuristic' to sort directions,
+ * based on the desired target position!
+ *
+ * Then, for each direction, we calculate how much that move would reduce
+ * our distance to the target, then sort by highest reduction.
+ */
+static void PrioritizeDirections(int directions[4], int currentX, int currentY,
+                                int targetX, int targetY)
+{
+    // Calculate distance reduction for each direction
+    int scores[4];
+
+    for (int i = 0; i < 4; i++)
+    {
+        int newX = currentX + dirX[i];
+        int newY = currentY + dirY[i];
+
+        int currentDist = abs(currentX - targetX) + abs(currentY - targetY);
+        int newDist = abs(newX - targetX) + abs(newY - targetY);
+
+        // Score is how much this direction reduces our distance to target
+        scores[i] = currentDist - newDist;
+    }
+
+    // Initialize directions array with indices 0-3
+    for (int i = 0; i < 4; i++)
+    {
+        directions[i] = i;
+    }
+
+    // Simple insertion sort by scores (highest first)
+    for (int i = 1; i < 4; i++)
+    {
+        int j = i;
+
+        while (j > 0 && scores[directions[j]] > scores[directions[j-1]])
+        {
+            int temp = directions[j];
+
+            directions[j] = directions[j-1];
+            directions[j-1] = temp;
+
+            j--;
+        }
+    }
+}
+
+/* Our directed path-finding function uses a modified Breadth-First Search,
+ * which aims to prioritize following existing corridors whenever possible.
+ *
+ * It only adds path cells when they create significant shortcuts =)
  */
 static bool FindPathBetweenDoors(int grid[GRID_HEIGHT][GRID_WIDTH],
     Corridor currentDoor, int nextDoorX, int nextDoorY,
@@ -141,108 +333,160 @@ static bool FindPathBetweenDoors(int grid[GRID_HEIGHT][GRID_WIDTH],
     int directDistance = abs(nextDoorX - currentDoor.x) + abs(nextDoorY - currentDoor.y);
     int maxAllowedLength = (int)(directDistance * PATH_LENGTH_THRESHOLD);
 
-    /* We limit new path creation to exactly 4 cells maximum.
-     * This forces the algorithm to heavily prioritize existing corridors and paths,
-     * while still allowing small detours when necessary.
+    /* We limit new path creation to exactly MAX_NEW_PATH_CELLS maximum.
+     * This forces the algorithm to heavily prioritize existing corridors,
+     * while still allowing minimal interventions when necessary.
      */
-    const int MAX_NEW_PATH_CELLS = 4;
-    int newPathCount = 0;  // Track how many new path cells we've created
+    int newPathCount = 0;
 
-    // Set byte size to 0 every time we reset paths! also faster than a loop!
+    // Reset visited array
     memset(visited, 0, GRID_SIZE * sizeof(bool));
 
-    int queueFront = 0; // Index to Take Cells from ( Front of Queue )
-    int queueBack = 0;  // Index to Add Cells to ( Back of Queue )
+    // Queue management
+    int queueFront = 0;
+    int queueBack = 0;
 
-    // Starting Position: ( add, increment, set visited )
-    queue[queueBack] = currentDoor;
-    queueBack++;
+    // Start from the current door
+    queue[queueBack++] = currentDoor;
     visited[GET_GRID_INDEX(currentDoor.x, currentDoor.y)] = true;
 
-    // BSF, Breadth-First Search Algorithm attempt
+    // Modified BFS with corridor prioritization
     while (queueFront < queueBack)
     {
         Corridor current = queue[queueFront++];
 
-        for (int i = 0; i < 4; ++i) // directions
+        // Get direction priorities based on target position
+        int directions[4];
+        PrioritizeDirections(directions, current.x, current.y, nextDoorX, nextDoorY);
+
+        // Check each direction in priority order
+        for (int d = 0; d < 4; ++d)
         {
-            int newX = current.x;
-            int newY = current.y;
+            int i = directions[d];
+            int newX = current.x + dirX[i];
+            int newY = current.y + dirY[i];
 
-            bool canExtend = false;
+            // Skip invalid positions
+            if (!IS_VALID_CELL(newX, newY)) {
+                continue;
+            }
+
+            // Skip already visited cells
+            if (visited[GET_GRID_INDEX(newX, newY)]) {
+                continue;
+            }
+
+            // Check if we've reached the target door
+            if (newX == nextDoorX && newY == nextDoorY) {
+                previous[GET_GRID_INDEX(newX, newY)] = current;
+                return true;
+            }
+
+            bool usePosition = false;
             bool isNewPath = false;
-            bool isVerticalMove = (dirX[i] == 0); // If moving up/down
 
-            for (int scout = 1; scout <= CELL_SCOUT_AMOUNT; scout++)
-            {
-                newX += dirX[i];
-                newY += dirY[i];
+            // First priority: use existing corridors or paths
+            if (grid[newY][newX] == CELL_CORRIDOR || grid[newY][newX] == CELL_PATH) {
+                usePosition = true;
+            }
+            // Second priority: create connecting path cells if needed
+            else if (CAN_BE_PATH(grid[newY][newX]) &&
+                     grid[newY][newX] != CELL_DOOR &&
+                     queueBack < maxAllowedLength &&
+                     newPathCount < MAX_NEW_PATH_CELLS) {
 
-                if (!IS_VALID_CELL(newX, newY))
-                {
-                    break;
+                // Only place path cells that truly connect corridor networks
+                // or are immediately adjacent to existing paths/corridors
+                bool connectsNetworks = ConnectsDistinctCorridors(grid, newX, newY);
+                bool adjacentToPath = false;
+
+                for (int dir = 0; dir < 4; dir++) {
+                    int adjX = newX + dirX[dir];
+                    int adjY = newY + dirY[dir];
+
+                    if (IS_IN_GRID(adjX, adjY) &&
+                        (grid[adjY][adjX] == CELL_CORRIDOR || grid[adjY][adjX] == CELL_PATH)) {
+                        adjacentToPath = true;
+                        break;
+                    }
                 }
 
-                // Check if we've reached the next room's door
-                if (newX == nextDoorX && newY == nextDoorY)
-                {
-                    previous[GET_GRID_INDEX(newX, newY)] = current; // Store the path we found!
-                    return true;
-                }
-
-                // Prioritize existing corridors AND paths, only create new paths if necessary
-                if (!visited[GET_GRID_INDEX(newX, newY)])
-                {
-                    if (grid[newY][newX] == CELL_CORRIDOR || grid[newY][newX] == CELL_PATH)
-                    {
-                        // Check if using this corridor would create a 2-cell wide path
-                        if (IsValidPathPlacement(grid, newX, newY, isVerticalMove))
-                        {
-                            canExtend = true;
-                            isNewPath = false;
-                            break;  // Immediately use existing corridor or path
-                        }
-                    }
-                    else if (CAN_BE_PATH(grid[newY][newX]) &&
-                             grid[newY][newX] != CELL_DOOR &&
-                             queueBack < maxAllowedLength &&
-                             newPathCount < MAX_NEW_PATH_CELLS &&
-                             IsValidPathPlacement(grid, newX, newY, isVerticalMove))
-                    {
-                        canExtend = true;
-                        isNewPath = true;
-                    }
+                if ((connectsNetworks || adjacentToPath) &&
+                    IsValidPathPlacement(grid, newX, newY)) {
+                    usePosition = true;
+                    isNewPath = true;
                 }
             }
 
-            // If paths can be extended,
-            if (canExtend)
-            {
-                newX = current.x + dirX[i];
-                newY = current.y + dirY[i];
+            if (usePosition) {
+                queue[queueBack++] = (Corridor){newX, newY};
+                visited[GET_GRID_INDEX(newX, newY)] = true;
+                previous[GET_GRID_INDEX(newX, newY)] = current;
 
-                // If not visited at our new position,
-                if (!visited[GET_GRID_INDEX(newX, newY)])
-                {
-                    queue[queueBack] = (Corridor){newX, newY}; // add new position to queue
-                    queueBack++; // Move queue end forward
-
-                    visited[GET_GRID_INDEX(newX, newY)] = true; // mark as visited
-                    previous[GET_GRID_INDEX(newX, newY)] = current; // remember path!
-
-                    if (isNewPath)
-                    {
-                        newPathCount++;
-                    }
+                if (isNewPath) {
+                    newPathCount++;
                 }
             }
         }
     }
 
-    // Return false when no path is found, keeping the search within our 4-cell new path limit
+    // No path found within constraints
     return false;
 }
 
+/* This is mostly a helper safety function. I implemented this to make sure that,
+ * in the case where our pathfinding somehow fails and the dungeon does not generate,
+ * we must allow to ease our constraints. We don't want failed generation!
+ */
+static bool FindPathWithFallbacks(int grid[GRID_HEIGHT][GRID_WIDTH],
+                                 Corridor startDoor, int endDoorX, int endDoorY,
+                                 Corridor* queue, bool* visited, Corridor* previous)
+{
+    int temporaryLimit = MAX_NEW_PATH_CELLS;
+
+    if (FindPathBetweenDoors(grid, startDoor, endDoorX, endDoorY, queue, visited, previous))
+    {
+        return true;
+    }
+
+    // In the case that our path finding failed: we want to allow more path cells and try again!
+    int attempts = 1;
+
+    for (int newLimit = MAX_NEW_PATH_CELLS * 2; newLimit <= 12; newLimit += 2)
+    {
+        // Temporarily increase the path limit
+        temporaryLimit = newLimit;
+
+        if (FindPathBetweenDoors(grid, startDoor, endDoorX, endDoorY, queue, visited, previous))
+        {
+            printf("Connected using fallback attempt %d (limit: %d path cells)\n",
+                   attempts, newLimit);
+
+            // Restore original limit
+            temporaryLimit = MAX_NEW_PATH_CELLS;
+            return true;
+        }
+
+        attempts++;
+    }
+
+    // Restore original limit
+    temporaryLimit = MAX_NEW_PATH_CELLS;
+    return false;
+}
+
+/* Our main path generation function!
+ * This is where everything comes together, we want to ensure to creates a network of connections ->
+ * -> with minimal interference to the existing maze structure!
+ *
+ * It connects rooms by finding the shortest paths between doors,
+ * preferring existing corridors and only creating new path cells
+ * when they significantly reduce travel distance.
+ *
+ * The boss room is intentionally connected last to ensure the player
+ * must traverse through the dungeon to reach it, but, it can still be otherwise traversed to.
+ * It might make it more inconvenient at best but it's simply for the pathfinding algorithm itself.
+ */
 void GeneratePaths(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int roomCount, int startRoomIndex, int bossRoomIndex)
 {
     bool* connected;
@@ -258,17 +502,30 @@ void GeneratePaths(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int roomCoun
         return;
     }
 
+    // Mark rooms as connected/not connected
     connected[startRoomIndex] = true;
+
+    if (bossRoomIndex >= 0 && bossRoomIndex < roomCount)
+    {
+        connected[bossRoomIndex] = true;  // Temporary mark, I want it to connect last!
+    }
+
     int currentRoom = startRoomIndex;
-    int roomsConnected = 1;
+    int roomsConnected = 1;  // Start room is connected
+
+    if (bossRoomIndex >= 0) // Count boss room as "handled" for now
+    {
+        roomsConnected++;
+    }
 
     // Track current door position for path connections
-    Corridor currentDoor = (Corridor){startDoorX, startDoorY};
+    Corridor currentDoor = (Corridor) { startDoorX, startDoorY };
 
-    // Keep trying until all rooms are connected
+    // Connect all rooms except boss room
     while (roomsConnected < roomCount)
     {
-        int nextRoom = FindClosestRoom(rooms, roomCount, connected, currentRoom);
+        int nextRoom = FindClosestRoomByDoors(grid, rooms, roomCount, connected,
+                                             currentRoom, currentDoor.x, currentDoor.y);
 
         // If we can't find an unconnected room from current position,
         // try from each connected room until we find a path
@@ -276,56 +533,66 @@ void GeneratePaths(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int roomCoun
         {
             bool foundNewPath = false;
 
-            // Try from each already connected room
+            // Try from each already connected room except boss room
             for (int tryRoom = 0; tryRoom < roomCount && !foundNewPath; tryRoom++)
             {
-                if (connected[tryRoom])
+                // Skip unconnected rooms and the boss room
+                if (!connected[tryRoom] || tryRoom == bossRoomIndex)
                 {
-                    // Find door position for this room
-                    int tryDoorX, tryDoorY;
-                    if (FindDoorPosition(grid, rooms[tryRoom], &tryDoorX, &tryDoorY))
+                    continue;
+                }
+
+                int tryDoorX, tryDoorY;
+
+                if (FindDoorPosition(grid, rooms[tryRoom], &tryDoorX, &tryDoorY))
+                {
+                    // Try to find path from this room to any unconnected room
+                    for (int targetRoom = 0; targetRoom < roomCount; targetRoom++)
                     {
-                        // Try to find path from this room to any unconnected room
-                        for (int targetRoom = 0; targetRoom < roomCount; targetRoom++)
+                        // Skip connected rooms and the boss room
+                        if (connected[targetRoom] || targetRoom == bossRoomIndex)
                         {
-                            if (!connected[targetRoom])
+                            continue;
+                        }
+
+                        int targetDoorX, targetDoorY;
+
+                        if (FindDoorPosition(grid, rooms[targetRoom], &targetDoorX, &targetDoorY))
+                        {
+                            Corridor tryDoor = (Corridor) { tryDoorX, tryDoorY };
+
+                            if (FindPathWithFallbacks(grid, tryDoor, targetDoorX, targetDoorY,
+                                queue, visited, previous))
                             {
-                                int targetDoorX, targetDoorY;
-                                if (FindDoorPosition(grid, rooms[targetRoom], &targetDoorX, &targetDoorY))
+                                // Mark the path
+                                int currentX = targetDoorX;
+                                int currentY = targetDoorY;
+                                Corridor prev = previous[GET_GRID_INDEX(currentX, currentY)];
+
+                                currentX = prev.x;
+                                currentY = prev.y;
+
+                                while (currentX != tryDoor.x || currentY != tryDoor.y)
                                 {
-                                    currentDoor = (Corridor){tryDoorX, tryDoorY};
-                                    if (FindPathBetweenDoors(grid, currentDoor, targetDoorX, targetDoorY,
-                                        queue, visited, previous))
+                                    if (grid[currentY][currentX] != CELL_DOOR &&
+                                        grid[currentY][currentX] != CELL_CORRIDOR)
                                     {
-                                        // Mark the path
-                                        int currentX = targetDoorX;
-                                        int currentY = targetDoorY;
-                                        Corridor prev = previous[GET_GRID_INDEX(currentX, currentY)];
-
-                                        currentX = prev.x;
-                                        currentY = prev.y;
-
-                                        while (currentX != currentDoor.x || currentY != currentDoor.y)
-                                        {
-                                            if (grid[currentY][currentX] != CELL_DOOR &&
-                                                grid[currentY][currentX] != CELL_CORRIDOR)
-                                            {
-                                                grid[currentY][currentX] = CELL_PATH;
-                                            }
-
-                                            prev = previous[GET_GRID_INDEX(currentX, currentY)];
-                                            currentX = prev.x;
-                                            currentY = prev.y;
-                                        }
-
-                                        printf("Connected room %d to room %d (retry path)\n", tryRoom, targetRoom);
-                                        currentRoom = targetRoom;
-                                        connected[targetRoom] = true;
-                                        roomsConnected++;
-                                        foundNewPath = true;
-                                        break;
+                                        grid[currentY][currentX] = CELL_PATH;
                                     }
+
+                                    prev = previous[GET_GRID_INDEX(currentX, currentY)];
+                                    currentX = prev.x;
+                                    currentY = prev.y;
                                 }
+
+                                printf("Connected room %d to room %d (retry path)\n", tryRoom, targetRoom);
+                                currentRoom = targetRoom;
+                                currentDoor = (Corridor){targetDoorX, targetDoorY};
+                                connected[targetRoom] = true;
+                                roomsConnected++;
+                                foundNewPath = true;
+
+                                break;
                             }
                         }
                     }
@@ -344,7 +611,7 @@ void GeneratePaths(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int roomCoun
 
             if (FindDoorPosition(grid, rooms[nextRoom], &nextDoorX, &nextDoorY))
             {
-                if (FindPathBetweenDoors(grid, currentDoor, nextDoorX, nextDoorY,
+                if (FindPathWithFallbacks(grid, currentDoor, nextDoorX, nextDoorY,
                     queue, visited, previous))
                 {
                     // Mark the path
@@ -376,16 +643,67 @@ void GeneratePaths(int grid[GRID_HEIGHT][GRID_WIDTH], Room rooms[], int roomCoun
                 }
                 else
                 {
-                    // If we can't connect to closest room, mark it as temporarily "connected"
-                    // so we can try other rooms first
-                    connected[nextRoom] = true;
+                    // If we can't connect to closest room even with fallbacks,
+                    // skip it temporarily
+                    printf("Could not connect to room %d - will try alternative paths\n", nextRoom);
+                    connected[nextRoom] = true;  // Mark as "handled" but not truly connected yet
+                    roomsConnected++;
                 }
+            }
+        }
+    }
+
+    // Now connect the boss room last (if we have one)
+    if (bossRoomIndex >= 0 && bossRoomIndex < roomCount && bossRoomIndex != startRoomIndex)
+    {
+        // Find door for the last connected room
+        int lastDoorX = currentDoor.x;
+        int lastDoorY = currentDoor.y;
+
+        // Boss door!
+        int bossDoorX, bossDoorY;
+
+        if (FindDoorPosition(grid, rooms[bossRoomIndex], &bossDoorX, &bossDoorY))
+        {
+            Corridor lastDoor = (Corridor){lastDoorX, lastDoorY};
+
+            // Try to connect the boss room
+            if (FindPathWithFallbacks(grid, lastDoor, bossDoorX, bossDoorY,
+                queue, visited, previous))
+            {
+                int currentX = bossDoorX;
+                int currentY = bossDoorY;
+                Corridor prev = previous[GET_GRID_INDEX(currentX, currentY)];
+
+                currentX = prev.x;
+                currentY = prev.y;
+
+                while (currentX != lastDoor.x || currentY != lastDoor.y)
+                {
+                    if (grid[currentY][currentX] != CELL_DOOR &&
+                        grid[currentY][currentX] != CELL_CORRIDOR)
+                    {
+                        grid[currentY][currentX] = CELL_PATH;
+                    }
+
+                    prev = previous[GET_GRID_INDEX(currentX, currentY)];
+                    currentX = prev.x;
+                    currentY = prev.y;
+                }
+
+                printf("Connected final room to boss room %d\n", bossRoomIndex);
+                connected[bossRoomIndex] = true;
+            }
+            else
+            {
+                printf("Failed to connect boss room!\n");
             }
         }
     }
 
     // Verify all rooms are actually connected
     bool allConnected = true;
+
     for (int i = 0; i < roomCount; i++)
     {
         if (!connected[i])

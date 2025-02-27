@@ -7,7 +7,15 @@
 
 // Path generation constants
 #define CELL_SCOUT_AMOUNT 2    // Cell to look ahead while pathfinding
-#define PATH_LENGTH_THRESHOLD 1.5f // Only create new path if it reduces length by 33%
+
+/* Higher values = more paths!
+ *  For PATH_LENGTH_THRESHOLD = 1.5:
+ *  x% > 1 - (1 / 1.5)
+ *  x% > 0.3333...
+ *  x% > 33.33%
+ */
+#define PATH_LENGTH_THRESHOLD 1.8f // This would be 40-ish percent
+#define MAX_NEW_PATH_CELLS 4
 
 // Main path generation function
 void GeneratePaths(int grid[GRID_HEIGHT][GRID_WIDTH],
