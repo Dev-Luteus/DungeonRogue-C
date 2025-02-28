@@ -16,7 +16,8 @@ Game InitGame(int width, int height)
         .generationAttempts = 0,
         .currentFloor = 1,  // Starting floor!
         .playerPos = {0, 0},
-        .transitioningFloors = false
+        .transitioningFloors = false,
+        .turnCounter = 0
     };
 
     // placeholder player
@@ -51,6 +52,10 @@ bool GenerateFloor(Game* game)
                     game->playerPos.x = game->rooms[i].x + (game->rooms[i].width / 2);
                     game->playerPos.y = game->rooms[i].y + (game->rooms[i].height / 2);
 
+                    // Set player's internal position
+                    game->player.x = game->playerPos.x;
+                    game->player.y = game->playerPos.y;
+
                     return true;
                 }
             }
@@ -60,6 +65,10 @@ bool GenerateFloor(Game* game)
             {
                 game->playerPos.x = game->rooms[0].x + (game->rooms[0].width / 2);
                 game->playerPos.y = game->rooms[0].y + (game->rooms[0].height / 2);
+
+                // Set player's internal position
+                game->player.x = game->playerPos.x;
+                game->player.y = game->playerPos.y;
 
                 return true;
             }
@@ -76,6 +85,7 @@ void GoDownStairs(Game* game)
 {
     game->currentFloor++;
     game->transitioningFloors = true;
+
     printf("Going down to floor %d\n", game->currentFloor);
 }
 
@@ -85,6 +95,7 @@ void GoUpStairs(Game* game)
     {
         game->currentFloor--;
         game->transitioningFloors = true;
+
         printf("Going up to floor %d\n", game->currentFloor);
     }
     else
@@ -105,69 +116,53 @@ void UpdateGame(Game* game)
         return;
     }
 
-    // Check for player interaction with stairs
-    int playerX = game->playerPos.x;
-    int playerY = game->playerPos.y;
-    int playerCell = game->grid[playerY][playerX];
+    int targetX, targetY;
+    ActionType actionType;
 
-    // Handle keyboard for demo/debug
-    if (IsKeyPressed(KEY_DOWN))
+    if (HandlePlayerInput(&game->player, game->grid, &actionType, &targetX, &targetY))
     {
-        // Find a stair down cell and check if player is on it
-        for (int y = 0; y < GRID_HEIGHT; y++)
+        game->turnCounter++;
+
+        switch (actionType)
         {
-            for (int x = 0; x < GRID_WIDTH; x++)
+            case ACTION_MOVE:
             {
-                if (game->grid[y][x] == CELL_STAIR_DOWN)
+                UpdatePlayerPosition(&game->player, targetX, targetY);
+                game->playerPos.x = targetX;
+                game->playerPos.y = targetY;
+
+                printf("Player moved to (%d,%d) - Turn: %d\n",
+                       targetX, targetY, game->turnCounter);
+            }
+            break;
+
+            case ACTION_USE_STAIRS:
+            {
+                int playerCell = game->grid[game->player.y][game->player.x];
+
+                if (playerCell == CELL_STAIR_DOWN)
                 {
-                    // Move player to stairs for demonstration
-                    game->playerPos.x = x;
-                    game->playerPos.y = y;
                     GoDownStairs(game);
                     return;
                 }
-            }
-        }
-    }
-
-    if (IsKeyPressed(KEY_UP) && game->currentFloor > 1)
-    {
-        // Find a stair up cell and check if player is on it
-        for (int y = 0; y < GRID_HEIGHT; y++)
-        {
-            for (int x = 0; x < GRID_WIDTH; x++)
-            {
-                if (game->grid[y][x] == CELL_STAIR_UP)
+                else if (playerCell == CELL_STAIR_UP && game->currentFloor > 1)
                 {
-                    // Move player to stairs for demonstration
-                    game->playerPos.x = x;
-                    game->playerPos.y = y;
                     GoUpStairs(game);
-
                     return;
                 }
             }
+            break;
         }
     }
-
-    // Our player doesn't exist yet but I wanted to leave this here if I pursue this further in the future
-    /*
-    if (playerCell == CELL_STAIR_DOWN && IsKeyPressed(KEY_SPACE)) {
-        GoDownStairs(game);
-    } else if (playerCell == CELL_STAIR_UP && IsKeyPressed(KEY_SPACE) && game->currentFloor > 1) {
-        GoUpStairs(game);
-    }
-    */
 }
 
-void DrawGame (Game game)
+void DrawGame(Game game)
 {
     BeginDrawing();
     {
         ClearBackground(RAYWHITE);
         PrintDungeon(game.grid, game.rooms, game.roomCount);
 
-        // Draw player as a yellow circle ( just for illustration purposes )
         const int totalHeight = GRID_TOTAL_HEIGHT;
         const int totalWidth = GRID_TOTAL_WIDTH;
         const int startX = CENTER_SCREEN_X(totalWidth);
@@ -185,8 +180,12 @@ void DrawGame (Game game)
         sprintf(floorText, "Floor: %d", game.currentFloor);
         DrawText(floorText, 40, 40, 30, BLACK);
 
-        // Draw help text
-        DrawText("UP/DOWN to change floors", 40, 100, 26, DARKGRAY);
+        char turnText[20];
+        sprintf(turnText, "Turn: %d", game.turnCounter);
+        DrawText(turnText, 40, 100, 30, BLACK);
+
+        DrawText("WASD/ARROW - MOVE", 40, 220, 26, DARKGRAY);
+        DrawText("SPACE - USE STAIRCASE", 40, 260, 26, DARKGRAY);
     }
     EndDrawing();
 }

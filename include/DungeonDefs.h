@@ -28,11 +28,14 @@
 // Grid utility macros
 #define GRID_SIZE (GRID_WIDTH * GRID_HEIGHT)
 #define HALF(x) ((x) >> 1)
+
 #define CENTER_SCREEN_X(width) ((GetScreenWidth() - (width)) >> 1)
 #define CENTER_SCREEN_Y(height) ((GetScreenHeight() - (height)) >> 1)
+
 #define IS_IN_GRID(x, y) ((x) >= 0 && (x) < GRID_WIDTH && (y) >= 0 && (y) < GRID_HEIGHT)
 #define IS_ROOM(cell) ((cell) >= ROOM_ID_START)
 #define IS_EMPTY(cell) ((cell) == CELL_EMPTY_1 || (cell) == CELL_EMPTY_2)
+
 #define GET_GRID_INDEX(x, y) ((y) * GRID_WIDTH + (x))
 #define IS_VALID_CELL(x, y) ((x) >= 1 && (x) < GRID_WIDTH - 1 && (y) >= 1 && (y) < GRID_HEIGHT - 1)
 #define CAN_BE_PATH(cell) ((cell) == CELL_CORRIDOR || (cell) == CELL_EMPTY_1 || (cell) == CELL_EMPTY_2)

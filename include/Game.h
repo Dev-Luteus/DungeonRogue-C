@@ -23,6 +23,7 @@ typedef struct
     int roomCount;
 
     Player player;
+    int turnCounter;
 } Game;
 
 Game InitGame(int width, int height);
