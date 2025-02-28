@@ -106,6 +106,13 @@ void GoUpStairs(Game* game)
 
 void UpdateGame(Game* game)
 {
+    if (IsKeyPressed(KEY_G))
+    {
+        printf("Regenerating dungeon...\n");
+        game->transitioningFloors = true;
+        return;
+    }
+
     if (!game->dungeonGenerated || game->transitioningFloors)
     {
         if (GenerateFloor(game))
@@ -186,6 +193,7 @@ void DrawGame(Game game)
 
         DrawText("WASD/ARROW - MOVE", 40, 220, 26, DARKGRAY);
         DrawText("SPACE - USE STAIRCASE", 40, 260, 26, DARKGRAY);
+        DrawText("G - Generate New Dungeon", 40, 300, 26, DARKGRAY);
     }
     EndDrawing();
 }

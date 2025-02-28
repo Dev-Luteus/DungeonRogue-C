@@ -333,16 +333,15 @@ static bool FindPathBetweenDoors(int grid[GRID_HEIGHT][GRID_WIDTH],
     int directDistance = abs(nextDoorX - currentDoor.x) + abs(nextDoorY - currentDoor.y);
     int maxAllowedLength = (int)(directDistance * PATH_LENGTH_THRESHOLD);
 
-    /* We limit new path creation to exactly MAX_NEW_PATH_CELLS maximum.
-     * This forces the algorithm to heavily prioritize existing corridors,
-     * while still allowing minimal interventions when necessary.
+    /* The goal is to limit the amount of new path generation,
+     * purposefully forcing our algorithm to prioritize existing corridors,
+     * which we do to promote winding paths and detours =)
      */
     int newPathCount = 0;
 
-    // Reset visited array
+    // Reset visited ( important )
     memset(visited, 0, GRID_SIZE * sizeof(bool));
 
-    // Queue management
     int queueFront = 0;
     int queueBack = 0;
 
@@ -350,12 +349,12 @@ static bool FindPathBetweenDoors(int grid[GRID_HEIGHT][GRID_WIDTH],
     queue[queueBack++] = currentDoor;
     visited[GET_GRID_INDEX(currentDoor.x, currentDoor.y)] = true;
 
-    // Modified BFS with corridor prioritization
+    // Here, we're implementing a modified BFS algorithm, to prioritize existing corridors!
     while (queueFront < queueBack)
     {
         Corridor current = queue[queueFront++];
 
-        // Get direction priorities based on target position
+        // Get direction priority based on target
         int directions[4];
         PrioritizeDirections(directions, current.x, current.y, nextDoorX, nextDoorY);
 
@@ -366,18 +365,18 @@ static bool FindPathBetweenDoors(int grid[GRID_HEIGHT][GRID_WIDTH],
             int newX = current.x + dirX[i];
             int newY = current.y + dirY[i];
 
-            // Skip invalid positions
-            if (!IS_VALID_CELL(newX, newY)) {
+            if (!IS_VALID_CELL(newX, newY))
+            {
                 continue;
             }
 
-            // Skip already visited cells
-            if (visited[GET_GRID_INDEX(newX, newY)]) {
+            if (visited[GET_GRID_INDEX(newX, newY)])
+            {
                 continue;
             }
 
-            // Check if we've reached the target door
-            if (newX == nextDoorX && newY == nextDoorY) {
+            if (newX == nextDoorX && newY == nextDoorY)
+            {
                 previous[GET_GRID_INDEX(newX, newY)] = current;
                 return true;
             }
@@ -385,45 +384,52 @@ static bool FindPathBetweenDoors(int grid[GRID_HEIGHT][GRID_WIDTH],
             bool usePosition = false;
             bool isNewPath = false;
 
-            // First priority: use existing corridors or paths
-            if (grid[newY][newX] == CELL_CORRIDOR || grid[newY][newX] == CELL_PATH) {
+            if (grid[newY][newX] == CELL_CORRIDOR || grid[newY][newX] == CELL_PATH)
+            {
                 usePosition = true;
             }
-            // Second priority: create connecting path cells if needed
+            /* If we can't use corridors, we should create new paths
+            */
             else if (CAN_BE_PATH(grid[newY][newX]) &&
                      grid[newY][newX] != CELL_DOOR &&
                      queueBack < maxAllowedLength &&
-                     newPathCount < MAX_NEW_PATH_CELLS) {
+                     newPathCount < MAX_NEW_PATH_CELLS)
+            {
 
                 // Only place path cells that truly connect corridor networks
                 // or are immediately adjacent to existing paths/corridors
                 bool connectsNetworks = ConnectsDistinctCorridors(grid, newX, newY);
                 bool adjacentToPath = false;
 
-                for (int dir = 0; dir < 4; dir++) {
+                for (int dir = 0; dir < 4; dir++)
+                {
                     int adjX = newX + dirX[dir];
                     int adjY = newY + dirY[dir];
 
                     if (IS_IN_GRID(adjX, adjY) &&
-                        (grid[adjY][adjX] == CELL_CORRIDOR || grid[adjY][adjX] == CELL_PATH)) {
+                        (grid[adjY][adjX] == CELL_CORRIDOR || grid[adjY][adjX] == CELL_PATH))
+                    {
                         adjacentToPath = true;
                         break;
                     }
                 }
 
                 if ((connectsNetworks || adjacentToPath) &&
-                    IsValidPathPlacement(grid, newX, newY)) {
+                    IsValidPathPlacement(grid, newX, newY))
+                {
                     usePosition = true;
                     isNewPath = true;
                 }
             }
 
-            if (usePosition) {
+            if (usePosition)
+            {
                 queue[queueBack++] = (Corridor){newX, newY};
                 visited[GET_GRID_INDEX(newX, newY)] = true;
                 previous[GET_GRID_INDEX(newX, newY)] = current;
 
-                if (isNewPath) {
+                if (isNewPath)
+                {
                     newPathCount++;
                 }
             }

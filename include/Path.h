@@ -14,8 +14,8 @@
  *  x% > 0.3333...
  *  x% > 33.33%
  */
-#define PATH_LENGTH_THRESHOLD 1.8f // This would be 40-ish percent
-#define MAX_NEW_PATH_CELLS 4
+#define PATH_LENGTH_THRESHOLD 1.2f
+#define MAX_NEW_PATH_CELLS 6
 
 // Main path generation function
 void GeneratePaths(int grid[GRID_HEIGHT][GRID_WIDTH],
