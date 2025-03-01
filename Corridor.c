@@ -113,7 +113,7 @@ void RandomizedFloodFill(int grid[GRID_HEIGHT][GRID_WIDTH], int startX, int star
         grid[startY][startX] = CELL_CORRIDOR;
     }
 
-    const int DIRECTION_BIAS_THRESHOLD = 30;  // 70% chance to continue in the same direction!
+    const int DIRECTION_BIAS_THRESHOLD = 40;  // 60% chance to continue in the same direction!
     const int MAX_ITERATIONS = GRID_WIDTH * GRID_HEIGHT; // Allow enough iterations to fill the grid
     int iterations = 0;
 
@@ -212,11 +212,11 @@ void RandomizedFloodFill(int grid[GRID_HEIGHT][GRID_WIDTH], int startX, int star
 // Here, we generate our mazes from multiple points!
 void GenerateMazes(int grid[GRID_HEIGHT][GRID_WIDTH])
 {
-    /* Instead of writing " 2 ", we use a constant for processing speed.
+    /* Instead of writing " 4 ", we use a constant for processing speed.
      * Apparently, this form of caching is faster than using direct value, at least theoretically,
      * So it is a stretch to claim this!
      */
-    const int STEP_SIZE = 2;
+    const int STEP_SIZE = 4;
     const int boundaryY = GRID_HEIGHT - STEP_SIZE;
     const int boundaryX = GRID_WIDTH - STEP_SIZE;
 
